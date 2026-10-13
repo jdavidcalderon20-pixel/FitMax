@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%">
+  <defs>
+    <!-- Gradiente de Fondo Neón Oscuro -->
+    <radialGradient id="bgGlow" cx="50%" cy="30%" r="75%">
+      <stop offset="0%" stop-color="#18181b" />
+      <stop offset="60%" stop-color="#09090b" />
+      <stop offset="100%" stop-color="#040405" />
+    </radialGradient>
+
+    <!-- Gradiente de Energía FitMax (Esmeralda Neón a Cian Eléctrico) -->
+    <linearGradient id="fitMaxGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#34d399" />
+      <stop offset="45%" stop-color="#10b981" />
+      <stop offset="100%" stop-color="#06b6d4" />
+    </linearGradient>
+
+    <!-- Gradiente de Resplandor Titanio -->
+    <linearGradient id="shieldBorder" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.8" />
+      <stop offset="50%" stop-color="#27272a" stop-opacity="0.4" />
+      <stop offset="100%" stop-color="#10b981" stop-opacity="0.8" />
+    </linearGradient>
+
+    <!-- Filtro de Resplandor Neón (Glow) -->
+    <filter id="neonGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Escudo Base Redondeado (Superelipse / Squircle moderno de App) -->
+  <rect width="512" height="512" rx="128" fill="url(#bgGlow)" />
+  
+  <!-- Borde Atlético con Resplandor Tecnológico -->
+  <rect width="500" height="500" x="6" y="6" rx="122" fill="none" stroke="url(#shieldBorder)" stroke-width="4" opacity="0.7" />
+
+  <!-- AURA DE ENERGÍA DE FONDO -->
+  <circle cx="256" cy="256" r="140" fill="#06b6d4" opacity="0.08" filter="blur(30px)" />
+  <circle cx="270" cy="240" r="110" fill="#10b981" opacity="0.12" filter="blur(25px)" />
+
+  <!-- SÍMBOLO MONOGRAMA FITMAX (F + M VECTORIAL ATLÉTICO) -->
+  <!-- Estructura estilizada que evoca la 'F' de Fit, la 'M' de Max, una mancuerna y un rayo ascendente -->
+  <g filter="url(#neonGlow)">
+    
+    <!-- Barra vertical izquierda / Poste de Fuerza (Pilar de la 'F' y la 'M') -->
+    <path 
+      d="M 148 130 
+         L 194 130 
+         L 194 382 
+         L 148 382 
+         Z" 
+      fill="url(#fitMaxGrad)" 
+      rx="8"
+    />
+
+    <!-- Travesaño superior de la 'F' / Impulso de Velocidad -->
+    <path 
+      d="M 194 130 
+         L 334 130 
+         L 310 176 
+         L 194 176 
+         Z" 
+      fill="url(#fitMaxGrad)" 
+    />
+
+    <!-- Diagonal central del vértice 'M' (Máximo Rendimiento / Vector de Progresión) -->
+    <path 
+      d="M 194 220 
+         L 282 220 
+         L 258 266 
+         L 194 266 
+         Z" 
+      fill="url(#fitMaxGrad)" 
+    />
+
+    <!-- Ala lateral derecha 'M' / Cima Apex (Símbolo de superación MAX) -->
+    <path 
+      d="M 284 220 
+         L 364 130 
+         L 364 382 
+         L 318 382 
+         L 318 248 
+         L 254 322 
+         L 230 292 
+         Z" 
+      fill="url(#fitMaxGrad)" 
+    />
+
+    <!-- Rayo de Energía Central (Acento 'MAX' neón verde) -->
+    <polygon 
+      points="370,126 406,126 366,220 410,220 338,360 356,242 324,242" 
+      fill="#34d399" 
+      opacity="0.95"
+    />
+  </g>
+
+  <!-- Puntos biomecánicos de precisión -->
+  <circle cx="148" cy="130" r="6" fill="#38bdf8" />
+  <circle cx="148" cy="382" r="6" fill="#34d399" />
+  <circle cx="364" cy="382" r="6" fill="#06b6d4" />
+</svg>
