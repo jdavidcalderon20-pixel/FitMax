@@ -17,10 +17,10 @@ export default function EvidenceBadge({
   const info = EVIDENCE_INFO[evidence] || EVIDENCE_INFO.B;
 
   const colorStyles = {
-    emerald: 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100',
-    blue: 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100',
-    purple: 'bg-purple-50 text-purple-800 border-purple-300 hover:bg-purple-100'
-  }[info.color] || 'bg-zinc-50 text-zinc-800 border-zinc-300';
+    emerald: 'bg-[#1FD08A]/15 text-[#1FD08A] border-[#1FD08A]/30 hover:bg-[#1FD08A]/25',
+    blue: 'bg-[#5B8DEF]/15 text-[#5B8DEF] border-[#5B8DEF]/30 hover:bg-[#5B8DEF]/25',
+    purple: 'bg-[#C084FC]/15 text-[#C084FC] border-[#C084FC]/30 hover:bg-[#C084FC]/25'
+  }[info.color] || 'bg-[#20252C] text-[#F4F2ED] border-[#282F38]';
 
   const badgePadding = size === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs';
 
@@ -41,18 +41,18 @@ export default function EvidenceBadge({
 
       {/* Tooltip / Explicación Científica Amigable */}
       {(showTooltip || showExplanation) && (
-        <div className="absolute bottom-full left-0 mb-2 z-50 w-72 p-3 bg-zinc-950 text-white rounded-2xl shadow-2xl border border-zinc-800 text-xs animate-fadeIn pointer-events-none">
-          <div className="flex items-center gap-1.5 mb-1 text-emerald-400 font-extrabold text-[11px] uppercase tracking-wide">
+        <div className="absolute bottom-full left-0 mb-2 z-50 w-72 p-3 bg-[#15181D] text-[#F4F2ED] rounded-2xl shadow-2xl border border-[#282F38] text-xs animate-fadeIn pointer-events-none">
+          <div className="flex items-center gap-1.5 mb-1 text-[#1FD08A] font-extrabold text-[11px] uppercase tracking-wide">
             <Sparkles className="w-3.5 h-3.5" />
             <span>Respaldado por evidencia</span>
           </div>
-          <p className="font-bold text-zinc-100 mb-1">{info.label}</p>
-          <p className="text-zinc-300 text-[11px] leading-relaxed">
+          <p className="font-bold text-[#F4F2ED] mb-1">{info.label}</p>
+          <p className="text-[#A8B0BB] text-[11px] leading-relaxed">
             {info.explanation}
           </p>
-          <div className="mt-2 pt-2 border-t border-zinc-800/80 text-[10px] text-zinc-400 flex items-center justify-between">
+          <div className="mt-2 pt-2 border-t border-[#282F38] text-[10px] text-[#A8B0BB] flex items-center justify-between">
             <span>Metodología FitMax</span>
-            <span className="font-mono text-emerald-400">Ciencia Deportiva</span>
+            <span className="font-mono text-[#1FD08A]">Ciencia deportiva</span>
           </div>
         </div>
       )}

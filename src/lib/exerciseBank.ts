@@ -314,7 +314,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'sentadilla_sissy',
-    name: 'Sentadilla Sissy (Sissy Squat)',
+    name: 'Sentadilla sissy (inclinando el cuerpo hacia atrás)',
     muscleGroup: 'Cuádriceps',
     pattern: 'Aislamiento',
     level: 'C',
@@ -359,7 +359,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   // ==========================================
   {
     id: 'hip_thrust_barra',
-    name: 'Hip Thrust con barra',
+    name: 'Empuje de cadera con barra (Hip thrust)',
     muscleGroup: 'Glúteos',
     pattern: 'Dominante cadera',
     level: 'B',
@@ -381,7 +381,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'hip_thrust_pausa_2s',
-    name: 'Hip Thrust con barra (pausa de 2s arriba)',
+    name: 'Empuje de cadera con barra y pausa de 2s (Hip thrust)',
     muscleGroup: 'Glúteos',
     pattern: 'Dominante cadera',
     level: 'C',
@@ -628,7 +628,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'remo_pendlay_barra',
-    name: 'Remo Pendlay con barra (pesado)',
+    name: 'Remo Pendlay (remo desde el suelo)',
     muscleGroup: 'Espalda',
     pattern: 'Tracción horizontal',
     level: 'C',
@@ -820,7 +820,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   // ==========================================
   {
     id: 'hyrox_skierg',
-    name: 'SkiErg',
+    name: 'SkiErg (máquina de esquí)',
     muscleGroup: 'Cardio y Metabólico',
     pattern: 'Metabólico',
     level: 'B',
@@ -841,7 +841,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'hyrox_sled_push',
-    name: 'Sled Push',
+    name: 'Empuje de trineo (Sled push)',
     muscleGroup: 'Cuádriceps',
     pattern: 'Dominante rodilla',
     level: 'B',
@@ -861,7 +861,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'hyrox_sled_pull',
-    name: 'Sled Pull',
+    name: 'Arrastre de trineo (Sled pull)',
     muscleGroup: 'Espalda',
     pattern: 'Tracción horizontal',
     level: 'B',
@@ -881,7 +881,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'hyrox_burpee_broad_jumps',
-    name: 'Burpee Broad Jumps',
+    name: 'Burpee con salto largo (Burpee broad jumps)',
     muscleGroup: 'Cardio y Metabólico',
     pattern: 'Metabólico',
     level: 'B',
@@ -902,7 +902,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'hyrox_rowing',
-    name: 'Rowing',
+    name: 'Remo en máquina (Rowing)',
     muscleGroup: 'Cardio y Metabólico',
     pattern: 'Metabólico',
     level: 'B',
@@ -922,7 +922,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'hyrox_farmers_carry',
-    name: 'Farmers Carry',
+    name: 'Paseo del granjero (Farmers carry)',
     muscleGroup: 'Cardio y Metabólico',
     pattern: 'Carga y Agarre',
     level: 'B',
@@ -942,7 +942,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'hyrox_sandbag_lunges',
-    name: 'Sandbag Lunges',
+    name: 'Zancadas con saco (Sandbag lunges)',
     muscleGroup: 'Cuádriceps',
     pattern: 'Dominante rodilla',
     level: 'B',
@@ -962,7 +962,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'hyrox_wall_balls',
-    name: 'Wall Balls',
+    name: 'Lanzamientos de balón a la pared (Wall balls)',
     muscleGroup: 'Cardio y Metabólico',
     pattern: 'Metabólico',
     level: 'B',
@@ -983,7 +983,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'transicion_carrera_comprometida',
-    name: 'Transición Carrera Comprometida',
+    name: 'Correr con piernas cansadas (Compromised running)',
     muscleGroup: 'Cardio y Metabólico',
     pattern: 'Metabólico',
     level: 'B',
@@ -1003,7 +1003,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'ocr_sandbag_bucket_carry',
-    name: 'Sandbag / Bucket Carry',
+    name: 'Transporte de saco o balde (Sandbag / bucket carry)',
     muscleGroup: 'Cardio y Metabólico',
     pattern: 'Carga y Agarre',
     level: 'B',
@@ -1024,7 +1024,7 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
   },
   {
     id: 'ocr_dead_hang_barra',
-    name: 'Dead Hang en Barra (Pasivo y Activo)',
+    name: 'Colgado en barra (Dead hang pasivo y activo)',
     muscleGroup: 'Espalda',
     pattern: 'Carga y Agarre',
     level: 'A',
