@@ -5,9 +5,9 @@ import { PeriodizationPhase } from './periodization';
 export type HyroxLevel = 'base' | 'open' | 'pro';
 
 export const HYROX_LEVELS: { id: HyroxLevel; name: string; description: string }[] = [
-  { id: 'base', name: 'Nivel 1: Base', description: 'Construye capacidad de trabajo y técnica en cada estación antes de exigir ritmo de carrera' },
-  { id: 'open', name: 'Nivel 2: Race Ready (Open)', description: 'Trabajo específico a intensidad de carrera, pesos de la división Open' },
-  { id: 'pro', name: 'Nivel 3: Pro / Elite', description: 'Sobrecarga por encima del peso de carrera, simulaciones completas, pesos de división Pro' },
+  { id: 'base', name: 'Primera vez', description: 'Construye capacidad de trabajo y técnica en cada estación antes de exigir ritmo de carrera' },
+  { id: 'open', name: 'Competir (Open)', description: 'Trabajo específico a intensidad de carrera, pesos oficiales de la división Open' },
+  { id: 'pro', name: 'Élite (Pro)', description: 'Sobrecarga por encima del peso de carrera, simulaciones completas, pesos de división Pro' },
 ];
 
 export interface HyroxStation {

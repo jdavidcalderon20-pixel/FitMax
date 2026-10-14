@@ -335,6 +335,7 @@ export default function App() {
             selectedLevel={selectedLevel}
             onNavigate={handleNavigate}
             onOpenProfile={() => setActiveSection('profile')}
+            onNotification={showNotification}
           />
         )}
 

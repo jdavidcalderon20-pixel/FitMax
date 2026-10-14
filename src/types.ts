@@ -15,26 +15,38 @@ export interface GeneratedRoutine {
   sessionB: Exercise[];
 }
 
+export const getLevelDisplayName = (level: Level): string => {
+  switch (level) {
+    case 'A': return 'Base';
+    case 'B': return 'Intermedio';
+    case 'C': return 'Avanzado';
+    default: return 'Intermedio';
+  }
+};
+
 export const LEVELS = [
   {
-    id: 'A',
-    name: 'Nivel A: Base / Aprendizaje',
+    id: 'A' as Level,
+    name: 'Base',
     simpleName: 'Base',
     label: 'Base',
-    description: 'Estable, seguro y fácil de aprender. Fase 0 y 1.',
+    description: 'Estable, seguro y fácil de aprender. Fase de aprendizaje técnico.',
+    phrase: 'Aprendes la técnica paso a paso con máquinas guiadas y peso corporal sin riesgo de lesión.'
   },
   {
-    id: 'B',
-    name: 'Nivel B: Intermedio / Fuerza',
+    id: 'B' as Level,
+    name: 'Intermedio',
     simpleName: 'Intermedio',
     label: 'Intermedio',
-    description: 'Más carga y más control. Fase 2 y 3.',
+    description: 'Mayor carga, control y variedad con mancuernas, barras y poleas.',
+    phrase: 'Conoces los movimientos básicos y buscas ganar fuerza sostenida.'
   },
   {
-    id: 'C',
-    name: 'Nivel C: Avanzado',
+    id: 'C' as Level,
+    name: 'Avanzado',
     simpleName: 'Avanzado',
     label: 'Avanzado',
-    description: 'Alta demanda, exige técnica perfecta. Fase 4.',
+    description: 'Alta demanda en barras libres y movimientos multiarticulares pesados.',
+    phrase: 'Dominas la sobrecarga progresiva y ejercicios multiarticulares complejos.'
   },
 ];

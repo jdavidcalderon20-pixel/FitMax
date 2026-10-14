@@ -336,11 +336,11 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
                     localStorage.setItem(`fit_gen_${nickname}_race_weeks_rem`, String(w));
                   } catch (e) {}
                 }}
-                className={`px-2 py-1 rounded-lg text-xs font-bold transition-all ${
+                className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                   weeksRemaining === w ? 'bg-purple-600 text-white' : 'text-zinc-400 hover:text-white'
                 }`}
               >
-                {w}s
+                {w} sem
               </button>
             ))}
           </div>
@@ -379,29 +379,30 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
       <div className="grid grid-cols-2 gap-2 mb-4 bg-zinc-100 p-1.5 rounded-2xl">
         <button
           onClick={() => { setDiscipline('hyrox'); setActiveDay(0); }}
-          className={`py-2.5 rounded-xl text-sm font-black transition-all ${discipline === 'hyrox' ? 'bg-zinc-950 text-white shadow' : 'text-zinc-500 hover:text-zinc-800'}`}
+          className={`py-2.5 rounded-xl text-sm font-black transition-all cursor-pointer ${discipline === 'hyrox' ? 'bg-zinc-950 text-white shadow' : 'text-zinc-500 hover:text-zinc-800'}`}
         >
           Hyrox
         </button>
         <button
           onClick={() => { setDiscipline('ocr'); setActiveDay(0); }}
-          className={`py-2.5 rounded-xl text-sm font-black transition-all ${discipline === 'ocr' ? 'bg-zinc-950 text-white shadow' : 'text-zinc-500 hover:text-zinc-800'}`}
+          className={`py-2.5 rounded-xl text-sm font-black transition-all cursor-pointer ${discipline === 'ocr' ? 'bg-zinc-950 text-white shadow' : 'text-zinc-500 hover:text-zinc-800'}`}
         >
           OCR (Obstáculos)
         </button>
       </div>
 
-      {/* SUBNIVELES DE DISCIPLINA */}
+      {/* MI OBJETIVO / SUBNIVELES DE DISCIPLINA */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] font-bold text-zinc-500 mr-1">Mi objetivo:</span>
           {discipline === 'hyrox'
             ? HYROX_LEVELS.map((l) => (
                 <button
                   key={l.id}
                   onClick={() => setHyroxLevel(l.id)}
                   title={l.description}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                    hyroxLevel === l.id ? 'bg-emerald-500 border-emerald-500 text-zinc-950 font-black' : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300'
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                    hyroxLevel === l.id ? 'bg-[#1FD08A] border-[#1FD08A] text-zinc-950 font-black' : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300'
                   }`}
                 >
                   {l.name}
