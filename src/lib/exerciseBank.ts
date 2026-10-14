@@ -437,7 +437,8 @@ export const EXERCISE_BANK: ExerciseDetail[] = [
       'Mantener el torso vertical (eso transfiere el estímulo al cuádriceps).',
       'Cargar el peso en la pierna trasera.'
     ],
-    breathingTip: 'Inhala hondo al estirar el glúteo en la bajada; exhala al retornar.'
+    breathingTip: 'Inhala hondo al estirar el glúteo en la bajada; exhala al retornar.',
+    targetFocus: 'Hipertrofia unilateral de glúteo mayor en posición estirada mediante flexión de cadera.'
   },
   {
     id: 'patada_gluteo_polea',
@@ -1427,8 +1428,8 @@ function findSingleExercise(name: string): ExerciseDetail {
   const matchSciExact = SCIENTIFIC_EXERCISES.find((ex) => normalizeStr(ex.name) === cleanName);
   if (matchSciExact) {
     const isArm = matchSciExact.pattern === 'brazos' || matchSciExact.primary.some((p) => /b[íi]ceps|tr[íi]ceps|antebrazo/i.test(p));
-    const isGlute = matchSciExact.pattern === 'cadera' || matchSciExact.primary.some((p) => /gl[úu]teo/i.test(p));
-    const isQuad = matchSciExact.pattern === 'rodilla';
+    const isGlute = matchSciExact.pattern === 'bisagra' || matchSciExact.primary.some((p) => /gl[úu]teo/i.test(p));
+    const isQuad = matchSciExact.pattern === 'unilateral' || matchSciExact.primary.some((p) => /cu[áa]driceps/i.test(p));
     const fallbackMedia = findExerciseMedia(matchSciExact.name);
 
     return {
@@ -1440,22 +1441,22 @@ function findSingleExercise(name: string): ExerciseDetail {
         ? 'Glúteos'
         : isQuad
         ? 'Cuádriceps'
-        : matchSciExact.pattern === 'empuje_horizontal'
+        : matchSciExact.pattern === 'empuje_h'
         ? 'Pecho'
-        : matchSciExact.pattern === 'empuje_vertical'
+        : matchSciExact.pattern === 'empuje_v'
         ? 'Hombros'
         : 'Espalda',
       pattern: isArm
         ? 'Aislamiento'
-        : matchSciExact.pattern === 'rodilla'
+        : isQuad
         ? 'Dominante rodilla'
-        : matchSciExact.pattern === 'cadera'
+        : matchSciExact.pattern === 'bisagra'
         ? 'Dominante cadera'
-        : matchSciExact.pattern === 'empuje_horizontal'
+        : matchSciExact.pattern === 'empuje_h'
         ? 'Empuje horizontal'
-        : matchSciExact.pattern === 'empuje_vertical'
+        : matchSciExact.pattern === 'empuje_v'
         ? 'Empuje vertical'
-        : matchSciExact.pattern === 'traccion_vertical'
+        : matchSciExact.pattern === 'traccion_v'
         ? 'Tracción vertical'
         : 'Tracción horizontal',
       level: matchSciExact.evidence,

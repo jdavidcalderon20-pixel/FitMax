@@ -19,16 +19,22 @@ export const LEVELS = [
   {
     id: 'A',
     name: 'Nivel A: Base / Aprendizaje',
+    simpleName: 'Base',
+    label: 'Base',
     description: 'Estable, seguro y fácil de aprender. Fase 0 y 1.',
   },
   {
     id: 'B',
     name: 'Nivel B: Intermedio / Fuerza',
+    simpleName: 'Intermedio',
+    label: 'Intermedio',
     description: 'Más carga y más control. Fase 2 y 3.',
   },
   {
     id: 'C',
     name: 'Nivel C: Avanzado',
+    simpleName: 'Avanzado',
+    label: 'Avanzado',
     description: 'Alta demanda, exige técnica perfecta. Fase 4.',
   },
 ];

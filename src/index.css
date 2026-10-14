@@ -1,6 +1,41 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+:root {
+  /* Tokens Modo Oscuro (Grafito / Pizarra) */
+  --bg-base: #15181D;
+  --bg-surface: #20252C;
+  --bg-surface-elevated: #282F38;
+  --text-main: #F4F2ED;
+  --text-muted: #A8B0BB;
+
+  /* Color de Marca y Acciones */
+  --color-brand: #1FD08A;
+  --color-brand-hover: #1ab87a;
+
+  /* Disciplinas */
+  --disc-gym: #5B8DEF;
+  --disc-running: #F2A33A;
+  --disc-hiit: #F2685B;
+  --disc-hyrox: #8E6CF0;
+  --disc-ocr: #8CB04A;
+
+  /* Estados */
+  --state-success: #1FD08A;
+  --state-warning: #F2A33A;
+  --state-error: #E5484D;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;

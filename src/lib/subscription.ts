@@ -1,5 +1,11 @@
 import { supabase } from './supabaseClient';
 
+/**
+ * Bandera para pausar el flujo de monetización y pases VIP en la interfaz,
+ * preservando intacta toda la lógica interna.
+ */
+export const ENABLE_MONETIZATION = false;
+
 export type SubscriptionTier = 'free' | 'pro' | 'beta_lifetime';
 export type SubscriptionStatus = 'active' | 'past_due' | 'trialing' | 'canceled';
 export type UserRole = 'athlete' | 'admin';

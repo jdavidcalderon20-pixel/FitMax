@@ -19,8 +19,12 @@ import {
   ChevronRight,
   Cloud,
   CloudOff,
-  Info
+  Info,
+  Sliders,
+  MoreHorizontal,
+  Check
 } from 'lucide-react';
+import WorkoutSessionView from './WorkoutSessionView';
 import { Level } from '../types';
 import { 
   WeeklyRoutine, 
@@ -78,6 +82,53 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
 
   // Estado para sustituir ejercicio individual
   const [swapModalState, setSwapModalState] = useState<{ dayId: number; exIndex: number; currentName: string } | null>(null);
+
+  // Estados de Sesión Activa (Imagen 1) y Modal Editar Plan
+  const [activeSessionDay, setActiveSessionDay] = useState<number | null>(null);
+  const [sessionInitialIndex, setSessionInitialIndex] = useState<number>(0);
+  const [showEditPlanModal, setShowEditPlanModal] = useState<boolean>(false);
+  const [showPlanMenu, setShowPlanMenu] = useState<boolean>(false);
+  const [warmupOpen, setWarmupOpen] = useState<boolean>(false);
+  const [amrapOpen, setAmrapOpen] = useState<boolean>(false);
+
+  // Estados temporales para el modal de Editar Plan
+  const [tempPlanDays, setTempPlanDays] = useState<3 | 4 | 5>(4);
+  const [tempPlanFocus, setTempPlanFocus] = useState<RoutineFocus>('standard');
+  const [tempPlanTargetWeeks, setTempPlanTargetWeeks] = useState<number>(8);
+  const [tempPlanCurrentWeek, setTempPlanCurrentWeek] = useState<number>(1);
+
+  const openEditPlanModal = () => {
+    setTempPlanDays(routineDays);
+    setTempPlanFocus(routineFocus);
+    setTempPlanTargetWeeks(mesocycleTargetWeeks);
+    setTempPlanCurrentWeek(mesocycleWeek);
+    setShowEditPlanModal(true);
+  };
+
+  const handleSavePlanEdits = () => {
+    let needsRegen = false;
+    if (tempPlanDays !== routineDays) {
+      handleSwitchDaysCount(tempPlanDays);
+      needsRegen = true;
+    }
+    if (tempPlanFocus !== routineFocus) {
+      handleSwitchFocus(tempPlanFocus);
+      needsRegen = true;
+    }
+    if (tempPlanTargetWeeks !== mesocycleTargetWeeks) {
+      handleSetTargetWeeks(tempPlanTargetWeeks);
+    }
+    if (!needsRegen && tempPlanCurrentWeek !== mesocycleWeek) {
+      setMesocycleWeek(tempPlanCurrentWeek);
+      try {
+        localStorage.setItem(`fit_gen_${nickname}_weekly_mesocycle_current_week`, String(tempPlanCurrentWeek));
+      } catch (e) {}
+    }
+    setShowEditPlanModal(false);
+    if (onNotification) {
+      onNotification('Plan de entrenamiento actualizado');
+    }
+  };
 
   // Estado para modal de técnica detallada de ejercicio
   const [inspectedExercise, setInspectedExercise] = useState<ExerciseDetail | null>(null);
@@ -663,361 +714,262 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
   }).length;
   const dayTotalCount = dayExercises.length;
 
+  // Si el usuario entra al Modo Sesión Activa (Imagen 1)
+  if (activeSessionDay !== null && currentDay) {
+    const sessionDay = weeklyRoutine[activeSessionDay] || currentDay;
+    return (
+      <WorkoutSessionView
+        dayId={activeSessionDay}
+        dayName={sessionDay.name}
+        exercises={sessionDay.exercises}
+        selectedLevel={selectedLevel}
+        nickname={nickname}
+        initialExerciseIndex={sessionInitialIndex}
+        onClose={() => setActiveSessionDay(null)}
+        onFinishWorkout={() => {
+          handleToggleWeeklyCompleteAll(activeSessionDay);
+          setActiveSessionDay(null);
+          if (onNotification) onNotification(`¡${sessionDay.name} terminado con éxito! 🎉`);
+        }}
+        onSwapExercise={(index, newName) => {
+          const alt = getAlternativeWeeklyExercises(activeSessionDay, index, selectedLevel, routineFocus, routineDays).find((a) => a.name === newName);
+          if (alt) handleSwapExercise(alt);
+        }}
+        onNotification={onNotification}
+      />
+    );
+  }
+
   return (
-    <div className="flex flex-col flex-1 h-full">
-      {/* HEADER DE MESOCICLO Y DURACIÓN */}
-      <div className="bg-zinc-900 text-white rounded-2xl p-4 md:p-5 mb-5 border border-zinc-800 shadow-xl">
-        {/* FILA SUPERIOR: BADGES, TÍTULO Y SEMANA ACTIVA */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3.5 border-b border-zinc-800/80">
+    <div className="flex flex-col flex-1 h-full text-[#F4F2ED]">
+      {/* CABECERA DEL BLOQUE DE ENTRENAMIENTO */}
+      <div className="bg-[#20252C] rounded-3xl p-5 mb-5 border border-[#282F38] shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-[#282F38]">
           <div>
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-              <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
-                Mesociclo de Musculación
+              <span className="text-[10px] uppercase font-black tracking-wider text-[#5B8DEF] bg-[#5B8DEF]/10 border border-[#5B8DEF]/25 px-2.5 py-0.5 rounded-full">
+                Bloque de entrenamiento
               </span>
-              {user ? (
-                <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
-                  <Cloud className="w-3 h-3" /> Nube Sincronizada
-                </span>
-              ) : (
-                <span className="bg-zinc-800 text-zinc-400 border border-zinc-700 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
-                  <CloudOff className="w-3 h-3" /> Modo Local
-                </span>
-              )}
+              <span className="text-xs text-[#A8B0BB]">
+                {routineFocus === 'glutes' ? 'Énfasis glúteos e inferior' : 'Torso / Pierna'}
+              </span>
             </div>
-            <h2 className="text-lg md:text-xl font-black tracking-tight text-zinc-100 flex items-center gap-2 flex-wrap">
-              <span>{routineFocus === 'glutes' ? 'Rutina Énfasis Glúteos & Inferior' : 'Rutina Fija Torso / Pierna'}</span>
-              <span className="text-xs md:text-sm font-bold text-zinc-400 bg-zinc-800/60 px-2 py-0.5 rounded-lg border border-zinc-700/60">
-                {mesocycleTargetWeeks} Semanas
-              </span>
+            <h2 className="text-xl font-black text-white">
+              Semana {mesocycleWeek} de {mesocycleTargetWeeks} · Día {activeWeeklyDay} de {routineDays}
             </h2>
-            <p className="text-xs text-zinc-400 mt-1 max-w-2xl leading-relaxed">
-              {routineFocus === 'glutes'
-                ? 'Estructura biomecánica con sobrecarga en elongación y acortamiento de glúteos, más tono estético en torso.'
-                : 'Ejecuta esta misma rutina durante tu ciclo para construir sobrecarga progresiva real. Tus pesos se conservan semana a semana.'}
+            <p className="text-xs text-[#A8B0BB] mt-0.5">
+              {routineDays} días de entrenamiento · {routineDays === 3 ? '4 días de descanso' : routineDays === 4 ? '3 días de descanso' : '2 días de descanso'}
             </p>
           </div>
 
-          {/* SELECTOR DE SEMANA DEL MESOCICLO */}
-          <div className="flex items-center gap-2 bg-zinc-950 p-2 rounded-2xl border border-zinc-800 shrink-0 self-start lg:self-auto shadow-inner">
-            <Calendar className="w-4 h-4 text-purple-400 ml-1" />
-            <span className="text-xs font-bold text-zinc-200">
-              Semana <strong className="text-purple-300 font-mono text-sm">{mesocycleWeek}</strong> de {mesocycleTargetWeeks}
-            </span>
-            <div className="flex items-center border-l border-zinc-800 pl-1.5 gap-1">
-              <button
-                onClick={() => setMesocycleWeek((w) => Math.max(1, w - 1))}
-                disabled={mesocycleWeek <= 1}
-                className="text-zinc-400 hover:text-white disabled:opacity-30 p-1 hover:bg-zinc-800 rounded-lg transition-colors text-xs"
-                title="Retroceder a semana anterior"
-              >
-                ◀
-              </button>
-              <button
-                onClick={() => setMesocycleWeek((w) => Math.min(mesocycleTargetWeeks, w + 1))}
-                disabled={mesocycleWeek >= mesocycleTargetWeeks}
-                className="text-zinc-400 hover:text-white disabled:opacity-30 p-1 hover:bg-zinc-800 rounded-lg transition-colors text-xs"
-                title="Avanzar a semana siguiente"
-              >
-                ▶
-              </button>
-            </div>
-          </div>
-        </div>
+          <div className="flex items-center gap-2 relative">
+            <button
+              onClick={openEditPlanModal}
+              className="bg-[#15181D] hover:bg-[#282F38] text-[#F4F2ED] border border-[#282F38] px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <Sliders className="w-3.5 h-3.5 text-[#5B8DEF]" />
+              <span>Editar plan</span>
+            </button>
 
-        {/* FILA INFERIOR ESPACIOSA: SELECTORES ORGANIZADOS EN 3 COLUMNAS LIMPIAS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3.5 items-end">
-          {/* 1. DÍAS POR SEMANA */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400">
-                Frecuencia Semanal:
-              </span>
-              <span className="text-[10px] text-emerald-400 font-bold">
-                {routineDays === 3 ? '4 descanso' : routineDays === 4 ? '3 descanso' : '2 descanso'}
-              </span>
-            </div>
-            <div className="grid grid-cols-3 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 shadow-inner">
-              <button
-                onClick={() => handleSwitchDaysCount(3)}
-                className={`py-2 px-1 rounded-lg text-xs font-bold transition-all text-center ${
-                  routineDays === 3
-                    ? 'bg-emerald-600 text-white font-black shadow-md'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-                title="3 días de entrenamiento Full Body (4 días de descanso o carrera)"
-              >
-                🌱 3 Días
-              </button>
-              <button
-                onClick={() => handleSwitchDaysCount(4)}
-                className={`py-2 px-1 rounded-lg text-xs font-bold transition-all text-center ${
-                  routineDays === 4
-                    ? 'bg-emerald-600 text-white font-black shadow-md'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-                title="4 días de entrenamiento Torso/Pierna (3 días de descanso)"
-              >
-                📅 4 Días
-              </button>
-              <button
-                onClick={() => handleSwitchDaysCount(5)}
-                className={`py-2 px-1 rounded-lg text-xs font-bold transition-all text-center ${
-                  routineDays === 5
-                    ? 'bg-emerald-600 text-white font-black shadow-md'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-                title="5 días de entrenamiento (2 días de descanso)"
-              >
-                ⚡ 5 Días
-              </button>
-            </div>
-          </div>
+            <button
+              onClick={() => setShowPlanMenu(!showPlanMenu)}
+              className="bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED] border border-[#282F38] p-2 rounded-xl text-xs transition-all cursor-pointer"
+              title="Opciones del bloque"
+            >
+              <MoreHorizontal className="w-4 h-4" />
+            </button>
 
-          {/* 2. ENFOQUE MUSCULAR */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block">
-              Enfoque de Rutina:
-            </span>
-            <div className="grid grid-cols-2 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 shadow-inner">
-              <button
-                onClick={() => handleSwitchFocus('standard')}
-                className={`py-2 px-2 rounded-lg text-xs font-bold transition-all text-center ${
-                  routineFocus === 'standard'
-                    ? 'bg-purple-600 text-white font-black shadow-md'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                🏋️‍♂️ Estándar
-              </button>
-              <button
-                onClick={() => handleSwitchFocus('glutes')}
-                className={`py-2 px-2 rounded-lg text-xs font-bold transition-all text-center flex items-center justify-center gap-1 ${
-                  routineFocus === 'glutes'
-                    ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white font-black shadow-md ring-1 ring-pink-400/40'
-                    : 'text-zinc-400 hover:text-white'
-                }`}
-              >
-                🍑 Glúteos
-              </button>
-            </div>
-          </div>
-
-          {/* 3. DURACIÓN DEL MESOCICLO */}
-          <div className="space-y-1">
-            <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 block">
-              Duración del Bloque:
-            </span>
-            <div className="grid grid-cols-4 gap-1 bg-zinc-950 p-1 rounded-xl border border-zinc-800 shadow-inner">
-              {[4, 6, 8, 12].map((w) => (
+            {showPlanMenu && (
+              <div className="absolute right-0 top-full mt-2 w-52 bg-[#20252C] border border-[#282F38] rounded-2xl p-2 shadow-2xl z-30 space-y-1 animate-fadeIn">
                 <button
-                  key={w}
-                  onClick={() => handleSetTargetWeeks(w)}
-                  className={`py-2 rounded-lg text-xs font-bold transition-all text-center ${
-                    mesocycleTargetWeeks === w
-                      ? 'bg-purple-600 text-white font-black shadow-md'
-                      : 'text-zinc-400 hover:text-white'
-                  }`}
+                  onClick={() => {
+                    if (window.confirm('¿Deseas crear un bloque nuevo? Se renovará tu plan de entrenamiento.')) {
+                      handleRegenerateRoutine();
+                    }
+                    setShowPlanMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-[#15181D] rounded-xl text-[#F4F2ED] flex items-center gap-2 cursor-pointer"
                 >
-                  {w} sem
+                  <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
+                  <span>Crear bloque nuevo</span>
                 </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Barra de progreso real del mesociclo por sesiones completadas */}
-        <div className="mt-4 pt-3 border-t border-zinc-800">
-          <div className="flex justify-between items-center text-[10px] font-bold text-zinc-400 mb-1.5 flex-wrap gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span>Sesiones del bloque: <strong className="text-emerald-400 font-mono text-xs">{completedSessionsTotal}</strong> / <strong className="text-zinc-300 font-mono text-xs">{totalSessionsInMesocycle}</strong></span>
-              <span className="text-zinc-600">•</span>
-              <span>Esta semana: <strong className="text-purple-300 font-mono">{completedDaysInCurrentWeek}/{daysPerWeek}</strong> días hechos</span>
-            </div>
-            <span className="font-mono text-emerald-400 text-xs font-black">{progressPercent}%</span>
-          </div>
-          <div className="w-full bg-zinc-800 rounded-full h-2.5 overflow-hidden">
-            <div
-              className={`h-full transition-all duration-500 ${
-                completedSessionsTotal >= totalSessionsInMesocycle
-                  ? 'bg-amber-500'
-                  : 'bg-gradient-to-r from-purple-500 via-teal-400 to-emerald-400'
-              }`}
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-
-          {/* Felicitación y botón para avanzar microciclo al completar todos los días de la semana */}
-          {isWeekFullyCompleted && mesocycleWeek < mesocycleTargetWeeks && (
-            <div className="mt-3 bg-emerald-950/70 border border-emerald-500/40 p-3 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-emerald-200 text-xs animate-fadeIn shadow-lg">
-              <div className="flex items-center gap-2.5">
-                <Sparkles className="w-5 h-5 text-emerald-400 shrink-0" />
-                <div>
-                  <p className="font-black text-emerald-300 uppercase text-[10px] tracking-wider">¡Semana completada al 100%!</p>
-                  <p className="text-xs text-emerald-100/90 font-medium">Has completado los {daysPerWeek} entrenamientos de la <strong>Semana {mesocycleWeek}</strong>. Tus estímulos musculares están consolidados.</p>
-                </div>
+                <button
+                  onClick={() => {
+                    handleResetWeeklyProgress();
+                    setShowPlanMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-[#15181D] rounded-xl text-[#F4F2ED] flex items-center gap-2 cursor-pointer"
+                >
+                  <ChevronRight className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Pasar a la semana siguiente</span>
+                </button>
               </div>
-              <button
-                onClick={handleResetWeeklyProgress}
-                className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black px-4 py-2 rounded-xl text-xs shrink-0 transition-all shadow-md self-end sm:self-auto"
-              >
-                Avanzar a Semana {mesocycleWeek + 1} ➔
-              </button>
-            </div>
-          )}
-
-          {completedSessionsTotal >= totalSessionsInMesocycle && (
-            <p className="text-[11px] text-amber-300 mt-2.5 font-medium flex items-center gap-1.5 bg-amber-950/40 p-2.5 rounded-xl border border-amber-500/30">
-              <Trophy className="w-4 h-4 text-amber-400 shrink-0" />
-              <span>
-                ¡Has completado las {totalSessionsInMesocycle} sesiones de tu ciclo de {mesocycleTargetWeeks} semanas! Es momento de tomar una semana de descarga (deload con 50% menos volumen) o renovar tu mesociclo.
-              </span>
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* NAVEGACIÓN DE DÍAS Y RESUMEN */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-3 border-b border-zinc-100 pb-4">
-        <div>
-          <span className="bg-emerald-100 text-emerald-800 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest inline-block mb-1 shadow-sm border border-emerald-200">
-            Estructura de {routineDays} Días
-          </span>
-          <h3 className="text-xl md:text-2xl font-bold tracking-tight text-zinc-900">
-            {currentDay.name}
-          </h3>
-          <p className="text-zinc-500 text-xs mt-0.5 italic">
-            {currentDay.subtitle}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-2 mt-2">
-            <div className="bg-emerald-50 text-emerald-700 px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 border border-emerald-100">
-              <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Progreso: {dayCompletedCount} / {dayTotalCount} Ejercicios</span>
-            </div>
-            {dayCompletedCount === dayTotalCount && (
-              <span className="text-[9px] bg-gradient-to-r from-emerald-500 to-teal-500 text-zinc-950 px-2 py-1 rounded-lg font-black tracking-wider uppercase">
-                ¡DÍA COMPLETADO! 🎉
-              </span>
             )}
           </div>
         </div>
 
-        {/* Pestañas dinámicas D1 a D4/D5 con indicador de día completado */}
-        <div className="bg-zinc-100 p-1 rounded-xl flex shrink-0 w-full md:w-auto overflow-x-auto">
-          {availableDays.map((dId) => {
-            const isDayFinished = weeklyRoutine && weeklyRoutine[dId] && weeklyRoutine[dId].exercises.length > 0 && weeklyRoutine[dId].exercises.every((ex) => weeklyLogs[`${selectedLevel}_day${dId}_${ex.name}`]?.completed);
-            return (
-              <button
-                key={dId}
-                onClick={() => setActiveWeeklyDay(dId)}
-                className={`flex-1 md:flex-none px-3.5 py-2 rounded-lg text-xs font-black transition-all flex items-center justify-center gap-1.5 whitespace-nowrap ${
-                  activeWeeklyDay === dId
-                    ? 'bg-white shadow text-emerald-600'
-                    : 'text-zinc-500 hover:text-zinc-800'
-                }`}
-              >
-                <span>Día {dId}</span>
-                {isDayFinished && <CheckCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />}
-              </button>
-            );
-          })}
+        {/* Barra de progreso de sesiones del bloque */}
+        <div className="mt-3.5">
+          <div className="flex justify-between items-center text-[11px] font-semibold text-[#A8B0BB] mb-1.5">
+            <span>Sesiones del bloque: <strong className="text-[#1FD08A] font-mono">{completedSessionsTotal}</strong> de {totalSessionsInMesocycle}</span>
+            <span className="font-mono text-[#1FD08A] font-bold">{progressPercent}%</span>
+          </div>
+          <div className="w-full bg-[#15181D] rounded-full h-2 overflow-hidden">
+            <div
+              className="bg-[#1FD08A] h-full transition-all duration-300"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
         </div>
       </div>
 
-      {/* CRONÓMETRO DE DESCANSO WIDGET */}
-      {timeLeft > 0 ? (
-        <div className="mb-5 bg-zinc-950 text-white rounded-2xl p-4 border border-zinc-800 shadow-xl">
+      {/* TARJETA DEL DÍA ACTIVO Y ACCIÓN PRINCIPAL */}
+      <div className="bg-[#20252C] rounded-3xl p-5 mb-5 border border-[#282F38] shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-black text-white">
+              {currentDay.name}
+            </h3>
+            <p className="text-xs text-[#A8B0BB] mt-0.5">
+              {currentDay.subtitle}
+            </p>
+          </div>
+
+          {/* Selector de días D1 a D4/D5 */}
+          <div className="flex items-center gap-1.5 bg-[#15181D] p-1 rounded-2xl border border-[#282F38]">
+            {availableDays.map((dId) => {
+              const isDayFinished = weeklyRoutine && weeklyRoutine[dId] && weeklyRoutine[dId].exercises.length > 0 && weeklyRoutine[dId].exercises.every((ex) => weeklyLogs[`${selectedLevel}_day${dId}_${ex.name}`]?.completed);
+              return (
+                <button
+                  key={dId}
+                  onClick={() => setActiveWeeklyDay(dId)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                    activeWeeklyDay === dId
+                      ? 'bg-[#5B8DEF] text-white shadow-sm'
+                      : 'text-[#A8B0BB] hover:text-white'
+                  }`}
+                >
+                  <span>Día {dId}</span>
+                  {isDayFinished && <span className="text-[10px] text-[#1FD08A]">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Botón protagonista para empezar la sesión (abre la vista de la Imagen 1) */}
+        <button
+          onClick={() => {
+            setSessionInitialIndex(0);
+            setActiveSessionDay(activeWeeklyDay);
+          }}
+          className="w-full bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black py-4 px-6 rounded-2xl text-base transition-all hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2 shadow-[0_4px_25px_rgba(31,208,138,0.35)] cursor-pointer"
+        >
+          <Play className="w-5 h-5 fill-current" />
+          <span>Empezar sesión ({currentDay.name})</span>
+        </button>
+      </div>
+
+      {/* CRONÓMETRO DE DESCANSO EN MODO REPOSO (SI ESTÁ ACTIVO) */}
+      {timeLeft > 0 && (
+        <div className="mb-5 bg-[#20252C] text-[#F4F2ED] rounded-2xl p-4 border border-[#282F38] shadow-xl">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-[#1FD08A]/15 text-[#1FD08A] flex items-center justify-center shrink-0">
                 <Timer className={`w-4 h-4 ${timerRunning ? 'animate-spin' : ''}`} />
               </div>
               <div>
-                <h4 className="font-bold text-[10px] tracking-wider text-emerald-400 uppercase">Recuperación Activa</h4>
-                <h3 className="font-bold text-xs text-zinc-300 truncate max-w-[150px] sm:max-w-xs">
-                  {activeExercise ? `Siguiente: ${activeExercise}` : 'Recuperación muscular'}
+                <h4 className="font-bold text-[10px] tracking-wider text-[#1FD08A] uppercase">Recuperación activa</h4>
+                <h3 className="font-bold text-xs text-[#F4F2ED] truncate max-w-[150px] sm:max-w-xs">
+                  {activeExercise ? `Siguiente: ${activeExercise}` : 'Descanso muscular'}
                 </h3>
               </div>
             </div>
             <div className="flex items-center justify-between sm:justify-end gap-3">
-              <div className="text-3xl font-extrabold font-mono tracking-tight text-emerald-400 tabular-nums">
+              <div className="text-3xl font-extrabold font-mono tracking-tight text-[#1FD08A] tabular-nums">
                 {formatTime(timeLeft)}
               </div>
-              <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800">
+              <div className="flex items-center gap-1 bg-[#15181D] p-1 rounded-xl border border-[#282F38]">
                 <button
                   onClick={() => setTimerRunning(!timerRunning)}
-                  className="p-1.5 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-emerald-400"
+                  className="p-1.5 hover:bg-[#282F38] rounded-lg text-[#A8B0BB] hover:text-[#1FD08A] cursor-pointer"
                 >
                   {timerRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
                 </button>
                 <button
                   onClick={() => { setTimeLeft((t) => t + 30); setTimerDuration((d) => d + 30); }}
-                  className="px-2 py-1 hover:bg-zinc-800 rounded-lg text-zinc-400 text-[10px] font-bold"
+                  className="px-2 py-1 hover:bg-[#282F38] rounded-lg text-[#A8B0BB] hover:text-white text-[10px] font-bold cursor-pointer"
                 >
                   +30s
                 </button>
                 <button
                   onClick={() => { setTimeLeft(0); setTimerRunning(false); }}
-                  className="p-1.5 hover:bg-red-950 rounded-lg text-zinc-500 hover:text-red-400"
+                  className="p-1.5 hover:bg-rose-950/60 rounded-lg text-[#A8B0BB] hover:text-[#F2685B] cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
           </div>
-          <div className="mt-2.5 w-full bg-zinc-900 rounded-full h-1 overflow-hidden">
+          <div className="mt-2.5 w-full bg-[#15181D] rounded-full h-1 overflow-hidden">
             <div
-              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full transition-all duration-1000 ease-linear"
+              className="bg-[#1FD08A] h-full transition-all duration-1000 ease-linear"
               style={{ width: `${(timeLeft / timerDuration) * 100}%` }}
             />
           </div>
         </div>
-      ) : showFinishedAlert ? (
-        <div className="mb-4 bg-gradient-to-r from-emerald-500 to-teal-500 text-zinc-950 rounded-2xl p-4 shadow-lg flex items-center justify-between border border-emerald-400">
-          <div className="flex items-center gap-2.5">
-            <Sparkles className="w-5 h-5 text-zinc-950" />
-            <div>
-              <h4 className="font-extrabold text-sm">¡Cronómetro de Descanso Terminado!</h4>
-              <p className="text-xs opacity-90 font-medium">Musculatura recuperada. ¡A por la siguiente serie!</p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowFinishedAlert(false)}
-            className="bg-zinc-950 text-white hover:bg-zinc-900 px-3 py-1 rounded-xl text-xs font-bold"
-          >
-            Entendido
-          </button>
-        </div>
-      ) : (
-        <div className="mb-4 bg-zinc-50 border border-zinc-200/80 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-inner">
-          <div className="flex items-center gap-2">
-            <Timer className="w-4 h-4 text-emerald-600" />
-            <span className="text-xs font-bold text-zinc-600">Descanso rápido entre series:</span>
-          </div>
-          <div className="flex flex-wrap gap-1">
-            {[30, 45, 60, 90, 120].map((s) => (
-              <button
-                key={s}
-                onClick={() => startTimer(s, null)}
-                className="bg-white hover:bg-emerald-50 text-zinc-800 hover:text-emerald-700 font-extrabold px-2.5 py-1 rounded-lg text-xs border border-zinc-200"
-              >
-                +{s}s
-              </button>
-            ))}
-          </div>
-        </div>
       )}
 
-      {/* AVISO DE CALENTAMIENTO */}
-      <div className="mb-4 flex items-start gap-2 bg-amber-50 border border-amber-200/70 rounded-xl px-3 py-2">
-        <Flame className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
-        <p className="text-[11px] text-amber-800 leading-snug">
-          <span className="font-bold">Calentamiento RAMP:</span> 5-10 min de cardio ligero + 1-2 series de aproximación en tu primer ejercicio para preparar articulaciones y sistema nervioso.
-        </p>
+      {/* AVISO DE CALENTAMIENTO RAMP PLEGABLE */}
+      <div className="mb-4 bg-[#20252C] border border-[#282F38] rounded-2xl overflow-hidden transition-all">
+        <button
+          onClick={() => setWarmupOpen(!warmupOpen)}
+          className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-[#282F38]/50 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-amber-500/15 text-amber-400 flex items-center justify-center shrink-0">
+              <Flame className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-[#F4F2ED]">Calentamiento RAMP (5-10 min)</span>
+              <p className="text-[11px] text-[#A8B0BB]">Prepara articulaciones y sistema nervioso antes de cargar peso</p>
+            </div>
+          </div>
+          <ChevronRight className={`w-4 h-4 text-[#A8B0BB] transition-transform duration-200 ${warmupOpen ? 'rotate-90' : ''}`} />
+        </button>
+
+        {warmupOpen && (
+          <div className="px-4 pb-4 pt-1 border-t border-[#282F38] space-y-2 text-xs text-[#A8B0BB]">
+            <div className="flex items-start gap-2.5 bg-[#15181D] p-2.5 rounded-xl border border-[#282F38]">
+              <span className="font-mono font-bold text-amber-400 shrink-0">1. R</span>
+              <div>
+                <strong className="text-white">Aumento de pulso:</strong> 3 a 5 min de cardio ligero (bici, cinta o elíptica suave).
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5 bg-[#15181D] p-2.5 rounded-xl border border-[#282F38]">
+              <span className="font-mono font-bold text-amber-400 shrink-0">2. A</span>
+              <div>
+                <strong className="text-white">Activación neuromuscular:</strong> 1 serie con banda o peso corporal para escápulas o glúteos.
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5 bg-[#15181D] p-2.5 rounded-xl border border-[#282F38]">
+              <span className="font-mono font-bold text-amber-400 shrink-0">3. M</span>
+              <div>
+                <strong className="text-white">Movilidad articular dinámica:</strong> 5-8 repeticiones dinámicas para cadera, tobillos y columna torácica.
+              </div>
+            </div>
+            <div className="flex items-start gap-2.5 bg-[#15181D] p-2.5 rounded-xl border border-[#282F38]">
+              <span className="font-mono font-bold text-amber-400 shrink-0">4. P</span>
+              <div>
+                <strong className="text-white">Potenciación:</strong> 1-2 series de aproximación con 50% y 75% del peso objetivo en tu primer ejercicio.
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* LISTA DE EJERCICIOS */}
-      <div className="space-y-3 flex-1 overflow-y-auto">
+      {/* LISTA DE EJERCICIOS DEL DÍA (TARJETAS COMPACTAS) */}
+      <div className="space-y-2.5 flex-1 overflow-y-auto">
         {dayExercises.map((exercise, index) => {
           const key = `${selectedLevel}_day${activeWeeklyDay}_${exercise.name}`;
           const log = weeklyLogs[key] || { weight: '', reps: '', completed: false };
@@ -1026,117 +978,109 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
           return (
             <div
               key={exercise.name}
-              className={`flex flex-col lg:flex-row lg:items-center justify-between p-4 rounded-2xl border transition-all duration-200 gap-3.5 ${
+              className={`p-4 rounded-2xl border transition-all duration-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                 log.completed
-                  ? 'bg-emerald-50/40 border-emerald-300'
-                  : 'bg-zinc-50 border-zinc-200 hover:bg-white hover:border-zinc-300'
+                  ? 'bg-[#1FD08A]/10 border-[#1FD08A]/35'
+                  : 'bg-[#20252C] border-[#282F38] hover:border-[#3A434F]'
               }`}
             >
               {/* Izquierda: Checkbox y Detalles */}
               <div className="flex items-start gap-3 flex-1 min-w-0">
                 <button
-                  onClick={() => handleToggleWeeklyCompleted(activeWeeklyDay, exercise.name)}
-                  className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleToggleWeeklyCompleted(activeWeeklyDay, exercise.name);
+                  }}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border transition-all cursor-pointer mt-0.5 ${
                     log.completed
-                      ? 'bg-emerald-500 border-emerald-500 text-zinc-950 shadow-sm'
-                      : 'bg-white border-zinc-300 text-zinc-300 hover:border-zinc-400'
+                      ? 'bg-[#1FD08A] border-[#1FD08A] text-[#15181D] shadow-sm'
+                      : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:border-[#5B8DEF]'
                   }`}
-                  title={log.completed ? 'Desmarcar' : 'Completar serie'}
+                  title={log.completed ? 'Desmarcar ejercicio' : 'Marcar ejercicio como completado'}
                 >
-                  <CheckCircle className={`w-5 h-5 ${log.completed ? 'text-zinc-950' : 'text-zinc-300'}`} />
+                  <CheckCircle className={`w-4 h-4 ${log.completed ? 'text-[#15181D]' : 'text-[#A8B0BB]'}`} />
                 </button>
 
-                <div className="flex-1 min-w-0">
+                <div 
+                  className="flex-1 min-w-0 cursor-pointer"
+                  onClick={() => {
+                    setSessionInitialIndex(index);
+                    setActiveSessionDay(activeWeeklyDay);
+                  }}
+                >
                   <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                    <span className="text-[10px] uppercase font-bold text-zinc-500 bg-zinc-200/60 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] font-bold text-[#A8B0BB] bg-[#15181D] px-2 py-0.5 rounded-md uppercase tracking-wider">
                       {exercise.category}
                     </span>
-                    <span className="text-[10px] font-bold text-zinc-500 bg-zinc-200/60 px-1.5 py-0.5 rounded">
-                      {exercise.defaultSets}× {exercise.defaultReps}
+                    <span className="text-[10px] font-bold text-white bg-[#15181D] px-2 py-0.5 rounded-md font-mono">
+                      {exercise.defaultSets}× {exercise.defaultReps} reps
                     </span>
-                    <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] font-bold text-purple-300 bg-purple-950/60 border border-purple-800/40 px-2 py-0.5 rounded-md">
                       RIR {getTargetRIR(exercise.category)}
                     </span>
-
-                    {/* Botón para cambiar ejercicio individual */}
-                    <button
-                      onClick={() => setSwapModalState({ dayId: activeWeeklyDay, exIndex: index, currentName: exercise.name })}
-                      className="text-[10px] font-bold text-zinc-600 hover:text-emerald-700 bg-white hover:bg-emerald-50 border border-zinc-200 px-2 py-0.5 rounded flex items-center gap-1 transition-all"
-                      title="Sustituir este ejercicio por otra máquina o variante sin reiniciar tu rutina de 2 meses"
-                    >
-                      <RefreshCw className="w-2.5 h-2.5" />
-                      <span>Cambiar ejercicio</span>
-                    </button>
                   </div>
 
-                  <div
-                    onClick={() => setInspectedExercise(findExerciseDetail(exercise.name))}
-                    className="flex items-center gap-1.5 cursor-pointer group/name w-fit"
-                    title="Toca para ver técnica correcta, errores comunes y respiración"
-                  >
-                    <p className="font-extrabold text-sm text-zinc-900 leading-tight group-hover/name:text-emerald-600 transition-colors">
+                  <div className="flex items-center gap-2 group/name w-fit">
+                    <p className={`font-black text-sm leading-snug group-hover/name:text-[#1FD08A] transition-colors ${
+                      log.completed ? 'text-white' : 'text-[#F4F2ED]'
+                    }`}>
                       {exercise.name}
                     </p>
-                    <Info className="w-3.5 h-3.5 text-zinc-400 group-hover/name:text-emerald-600 transition-colors shrink-0" />
                   </div>
+
                   {exercise.description && (
-                    <p className="text-xs text-zinc-500 mt-0.5 line-clamp-1 md:line-clamp-none">
+                    <p className="text-xs text-[#A8B0BB] mt-0.5 line-clamp-1">
                       {exercise.description}
                     </p>
                   )}
 
-                  {suggestion && (
-                    <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
-                        <ArrowUpDown className="w-3 h-3 text-emerald-600" />
-                        {suggestion.text}
-                      </span>
-                      {suggestion.trend && (
-                        <span className="text-[10px] text-zinc-500 font-semibold">{suggestion.trend}</span>
+                  {/* Historial o sugerencia de progresión */}
+                  {(log.weight || log.reps || suggestion) && (
+                    <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                      {(log.weight || log.reps) && (
+                        <span className="text-[11px] font-mono text-[#A8B0BB] bg-[#15181D] px-2 py-0.5 rounded border border-[#282F38]">
+                          Último: <strong className="text-white">{log.weight || '--'} kg</strong> × <strong className="text-white">{log.reps || '--'} reps</strong>
+                        </span>
+                      )}
+                      {suggestion && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#1FD08A] bg-[#1FD08A]/10 border border-[#1FD08A]/20 px-2 py-0.5 rounded">
+                          <ArrowUpDown className="w-3 h-3 text-[#1FD08A]" />
+                          {suggestion.text}
+                        </span>
                       )}
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Centro: Inputs de Peso y Reps */}
-              <div className="flex items-center gap-2.5 shrink-0 bg-white p-1.5 rounded-xl border border-zinc-200 shadow-sm w-full lg:w-auto justify-between lg:justify-start">
-                <div className="flex items-center gap-1.5 px-2 py-1 flex-1 lg:flex-initial">
-                  <span className="text-[10px] uppercase font-black text-zinc-400 select-none">PESO</span>
-                  <input
-                    type="text"
-                    placeholder="--"
-                    value={log.weight}
-                    onChange={(e) => handleUpdateWeeklyLog(activeWeeklyDay, exercise.name, 'weight', e.target.value)}
-                    className="w-12 bg-transparent text-zinc-900 focus:outline-none text-center text-xs font-bold font-mono"
-                    title="Peso en kg"
-                  />
-                  <span className="text-[10px] text-zinc-500 font-bold select-none">kg</span>
-                </div>
-
-                <div className="w-[1px] h-4 bg-zinc-200" />
-
-                <div className="flex items-center gap-1.5 px-2 py-1 flex-1 lg:flex-initial">
-                  <span className="text-[10px] uppercase font-black text-zinc-400 select-none">REPS</span>
-                  <input
-                    type="text"
-                    placeholder="--"
-                    value={log.reps}
-                    onChange={(e) => handleUpdateWeeklyLog(activeWeeklyDay, exercise.name, 'reps', e.target.value)}
-                    className="w-10 bg-transparent text-zinc-900 focus:outline-none text-center text-xs font-bold font-mono"
-                    title="Reps logradas"
-                  />
-                </div>
-              </div>
-
-              {/* Derecha: Botón de descanso */}
-              <div className="flex items-center justify-end shrink-0 gap-2 w-full lg:w-auto">
+              {/* Derecha: Acciones rápidas (Técnica, Cambiar ejercicio, Entrenar) */}
+              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
                 <button
-                  onClick={() => startTimer(getRecommendedRest(exercise.category), exercise.name)}
-                  className="w-full lg:w-auto bg-white hover:bg-emerald-500 text-zinc-700 hover:text-zinc-950 font-extrabold px-3.5 py-2 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 border border-zinc-200 shadow-sm"
+                  onClick={() => setInspectedExercise(findExerciseDetail(exercise.name))}
+                  className="p-2 bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] hover:text-white rounded-xl text-xs transition-colors border border-[#282F38] cursor-pointer"
+                  title="Ver técnica detallada"
                 >
-                  <Timer className="w-3.5 h-3.5 text-zinc-400" />
-                  <span>Descansar {getRecommendedRest(exercise.category)}s</span>
+                  <Info className="w-3.5 h-3.5" />
+                </button>
+
+                <button
+                  onClick={() => setSwapModalState({ dayId: activeWeeklyDay, exIndex: index, currentName: exercise.name })}
+                  className="px-2.5 py-1.5 bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] hover:text-[#5B8DEF] rounded-xl text-xs font-semibold transition-colors border border-[#282F38] flex items-center gap-1 cursor-pointer"
+                  title="Cambiar por ejercicio alternativo"
+                >
+                  <RefreshCw className="w-3 h-3" />
+                  <span className="hidden md:inline">Cambiar</span>
+                </button>
+
+                <button
+                  onClick={() => {
+                    setSessionInitialIndex(index);
+                    setActiveSessionDay(activeWeeklyDay);
+                  }}
+                  className="px-3 py-1.5 bg-[#1FD08A]/15 hover:bg-[#1FD08A] text-[#1FD08A] hover:text-[#15181D] rounded-xl text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <span>Entrenar</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>
@@ -1144,153 +1088,170 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
         })}
       </div>
 
-      {/* AMRAP COMPLEMENTARIO / ACTIVADOR */}
-      <div className="mt-6 bg-zinc-950 text-white rounded-3xl p-5 border border-zinc-800 shadow-xl relative overflow-hidden">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-zinc-800/80 pb-4 mb-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="bg-purple-500 text-white text-[9px] font-black tracking-widest px-2.5 py-0.5 rounded-full uppercase">
-                Finisher Opcional
-              </span>
-              <h4 className="text-base font-black text-zinc-100">
-                {amrapType === 'complementary'
-                  ? currentDay.amrapComplementary.name
-                  : currentDay.amrapActivator.name}
-              </h4>
+      {/* AMRAP COMPLEMENTARIO / ACTIVADOR PLEGABLE */}
+      <div className="mt-5 bg-[#20252C] rounded-3xl border border-[#282F38] shadow-xl overflow-hidden">
+        <button
+          onClick={() => setAmrapOpen(!amrapOpen)}
+          className="w-full p-4 flex items-center justify-between text-left hover:bg-[#282F38]/50 transition-colors cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
+              <Trophy className="w-4 h-4" />
             </div>
-            <p className="text-xs text-zinc-400 mt-1">
-              {amrapType === 'complementary'
-                ? currentDay.amrapComplementary.instructions
-                : currentDay.amrapActivator.instructions}
-            </p>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-black text-white">Finisher metabólico (AMRAP opcional)</span>
+                <span className="text-[10px] font-bold text-purple-300 bg-purple-950/80 px-2 py-0.5 rounded-full border border-purple-800/40">
+                  {amrapCustomDuration} min
+                </span>
+              </div>
+              <p className="text-[11px] text-[#A8B0BB] mt-0.5">
+                {amrapType === 'complementary' ? currentDay.amrapComplementary.name : currentDay.amrapActivator.name}
+              </p>
+            </div>
+          </div>
+          <ChevronRight className={`w-4 h-4 text-[#A8B0BB] transition-transform duration-200 ${amrapOpen ? 'rotate-90' : ''}`} />
+        </button>
 
-            {/* Selector de Duración 5, 7, 10 min con predeterminado según nivel */}
-            <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-              <span className="text-[11px] font-bold text-zinc-400">Duración AMRAP:</span>
-              {[5, 7, 10].map((mins) => {
-                const isSuggested = (mins === 5 && selectedLevel === 'A') || (mins === 7 && selectedLevel === 'B') || (mins === 10 && selectedLevel === 'C');
-                return (
+        {amrapOpen && (
+          <div className="p-5 pt-2 border-t border-[#282F38] space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-xs text-[#A8B0BB]">
+                  {amrapType === 'complementary'
+                    ? currentDay.amrapComplementary.instructions
+                    : currentDay.amrapActivator.instructions}
+                </p>
+
+                {/* Selector de Duración 5, 7, 10 min */}
+                <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+                  <span className="text-[11px] font-bold text-[#A8B0BB]">Duración:</span>
+                  {[5, 7, 10].map((mins) => {
+                    const isSuggested = (mins === 5 && selectedLevel === 'A') || (mins === 7 && selectedLevel === 'B') || (mins === 10 && selectedLevel === 'C');
+                    return (
+                      <button
+                        key={mins}
+                        onClick={() => {
+                          setAmrapCustomDuration(mins);
+                          setAmrapTimeLeft(mins * 60);
+                          setAmrapRunning(false);
+                          setShowAmrapAlert(false);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                          amrapCustomDuration === mins
+                            ? 'bg-purple-600 border-purple-500 text-white shadow'
+                            : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white'
+                        }`}
+                      >
+                        {mins} min {isSuggested ? `(Nivel ${selectedLevel})` : ''}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 bg-[#15181D] p-1 rounded-xl border border-[#282F38] shrink-0 self-start sm:self-auto">
+                <button
+                  onClick={() => setAmrapType('complementary')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    amrapType === 'complementary' ? 'bg-purple-600 text-white' : 'text-[#A8B0BB] hover:text-white'
+                  }`}
+                >
+                  Complementario
+                </button>
+                <button
+                  onClick={() => setAmrapType('activator')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                    amrapType === 'activator' ? 'bg-purple-600 text-white' : 'text-[#A8B0BB] hover:text-white'
+                  }`}
+                >
+                  Activador
+                </button>
+              </div>
+            </div>
+
+            {/* Ejercicios del AMRAP y Cronómetro */}
+            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+              <div className="flex-1 space-y-1.5 w-full">
+                {(amrapType === 'complementary'
+                  ? currentDay.amrapComplementary.exercises
+                  : currentDay.amrapActivator.exercises
+                ).map((ex, i) => (
+                  <div 
+                    key={i} 
+                    onClick={() => setInspectedExercise(findExerciseDetail(ex))}
+                    className="flex items-center justify-between text-xs text-[#F4F2ED] bg-[#15181D] hover:bg-[#282F38] hover:border-purple-500/50 px-3 py-2 rounded-xl border border-[#282F38] cursor-pointer transition-colors group"
+                    title="Toca para ver técnica de este ejercicio"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black flex items-center justify-center shrink-0">
+                        {i + 1}
+                      </span>
+                      <span className="group-hover:text-purple-300 transition-colors font-medium">{ex}</span>
+                    </div>
+                    <Info className="w-3 h-3 text-[#A8B0BB] group-hover:text-purple-400 shrink-0" />
+                  </div>
+                ))}
+              </div>
+
+              {/* Temporizador AMRAP */}
+              <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-4 flex flex-col items-center justify-center shrink-0 w-full md:w-56">
+                <div className="text-3xl font-extrabold font-mono tracking-tight text-purple-400 tabular-nums mb-2">
+                  {formatTime(amrapTimeLeft)}
+                </div>
+                <div className="flex items-center gap-2 w-full">
                   <button
-                    key={mins}
-                    onClick={() => {
-                      setAmrapCustomDuration(mins);
-                      setAmrapTimeLeft(mins * 60);
-                      setAmrapRunning(false);
-                      setShowAmrapAlert(false);
-                    }}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all ${
-                      amrapCustomDuration === mins
-                        ? 'bg-purple-600 border-purple-500 text-white shadow'
-                        : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:text-white'
+                    onClick={() => setAmrapRunning(!amrapRunning)}
+                    className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      amrapRunning ? 'bg-[#282F38] text-white hover:bg-[#323B47]' : 'bg-purple-600 text-white hover:bg-purple-500'
                     }`}
                   >
-                    {mins} min {isSuggested ? `(Nivel ${selectedLevel})` : ''}
+                    {amrapRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                    <span>{amrapRunning ? 'Pausar' : 'Empezar'}</span>
                   </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 bg-zinc-900 p-1 rounded-xl border border-zinc-800 shrink-0 self-start sm:self-auto">
-            <button
-              onClick={() => setAmrapType('complementary')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                amrapType === 'complementary' ? 'bg-purple-600 text-white' : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              Complementario
-            </button>
-            <button
-              onClick={() => setAmrapType('activator')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                amrapType === 'activator' ? 'bg-purple-600 text-white' : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              Activador
-            </button>
-          </div>
-        </div>
-
-        {/* Ejercicios del AMRAP y Cronómetro */}
-        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="flex-1 space-y-1.5 w-full">
-            {(amrapType === 'complementary'
-              ? currentDay.amrapComplementary.exercises
-              : currentDay.amrapActivator.exercises
-            ).map((ex, i) => (
-              <div 
-                key={i} 
-                onClick={() => setInspectedExercise(findExerciseDetail(ex))}
-                className="flex items-center justify-between text-xs text-zinc-300 bg-zinc-900/60 hover:bg-zinc-900 hover:border-purple-500/50 px-3 py-2 rounded-xl border border-zinc-800 cursor-pointer transition-colors group"
-                title="Toca para ver técnica de este ejercicio"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black flex items-center justify-center shrink-0">
-                    {i + 1}
-                  </span>
-                  <span className="group-hover:text-purple-300 transition-colors font-medium">{ex}</span>
+                  <button
+                    onClick={() => {
+                      setAmrapRunning(false);
+                      setAmrapTimeLeft(amrapCustomDuration * 60);
+                      setShowAmrapAlert(false);
+                    }}
+                    className="bg-[#282F38] hover:bg-[#323B47] text-[#A8B0BB] hover:text-white font-bold px-3 py-2 rounded-xl text-xs cursor-pointer"
+                  >
+                    Reiniciar
+                  </button>
                 </div>
-                <Info className="w-3 h-3 text-zinc-500 group-hover:text-purple-400 shrink-0" />
-              </div>
-            ))}
-          </div>
-
-          {/* Temporizador AMRAP */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex flex-col items-center justify-center shrink-0 w-full md:w-56">
-            <div className="text-3xl font-extrabold font-mono tracking-tight text-purple-400 tabular-nums mb-2">
-              {formatTime(amrapTimeLeft)}
-            </div>
-            <div className="flex items-center gap-2 w-full">
-              <button
-                onClick={() => setAmrapRunning(!amrapRunning)}
-                className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                  amrapRunning ? 'bg-zinc-800 text-white hover:bg-zinc-700' : 'bg-purple-600 text-white hover:bg-purple-500'
-                }`}
-              >
-                {amrapRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                <span>{amrapRunning ? 'Pausar' : 'Empezar'}</span>
-              </button>
-              <button
-                onClick={() => {
-                  setAmrapRunning(false);
-                  setAmrapTimeLeft(amrapCustomDuration * 60);
-                  setShowAmrapAlert(false);
-                }}
-                className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-bold px-3 py-2 rounded-xl text-xs"
-              >
-                Reiniciar
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {showAmrapAlert && (
-          <div className="mt-4 bg-gradient-to-r from-purple-500 to-indigo-600 text-white rounded-xl p-3.5 shadow-lg flex items-center justify-between border border-purple-400">
-            <div className="flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-amber-300 animate-bounce" />
-              <div>
-                <p className="text-xs font-black uppercase">¡AMRAP Completado!</p>
-                <p className="text-[11px] opacity-90">Gran esfuerzo para cerrar la sesión de hoy.</p>
               </div>
             </div>
-            <button
-              onClick={() => setShowAmrapAlert(false)}
-              className="bg-white text-zinc-950 text-xs font-black px-3 py-1 rounded-lg"
-            >
-              Genial
-            </button>
+
+            {showAmrapAlert && (
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl p-3.5 shadow-lg flex items-center justify-between border border-purple-400/50">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-amber-300 animate-bounce" />
+                  <div>
+                    <p className="text-xs font-black">¡AMRAP completado!</p>
+                    <p className="text-[11px] opacity-90">Gran esfuerzo para cerrar la sesión de hoy.</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowAmrapAlert(false)}
+                  className="bg-white text-zinc-950 text-xs font-black px-3 py-1 rounded-lg cursor-pointer"
+                >
+                  Genial
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* ACCIONES INFERIORES */}
-      <div className="mt-6 pt-4 border-t border-zinc-200 flex flex-col sm:flex-row gap-3">
+      {/* ACCIONES SECUNDARIAS AL FONDO */}
+      <div className="mt-6 pt-4 border-t border-[#282F38] flex flex-col sm:flex-row gap-3">
         <button
           onClick={() => handleToggleWeeklyCompleteAll(activeWeeklyDay)}
-          className={`flex-1 font-bold py-3.5 px-4 rounded-2xl transition-all uppercase tracking-wider text-xs shadow-md ${
+          className={`flex-1 font-bold py-3.5 px-4 rounded-2xl transition-all text-xs cursor-pointer ${
             dayCompletedCount === dayTotalCount
-              ? 'bg-zinc-200 hover:bg-zinc-300 text-zinc-900'
-              : 'bg-zinc-950 hover:bg-zinc-800 text-white'
+              ? 'bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] border border-[#282F38]'
+              : 'bg-[#20252C] hover:bg-[#282F38] text-[#F4F2ED] border border-[#282F38]'
           }`}
         >
           {dayCompletedCount === dayTotalCount
@@ -1300,48 +1261,183 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
 
         <button
           onClick={handleResetWeeklyProgress}
-          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 font-bold py-3.5 px-4 rounded-2xl transition-all text-xs"
+          className="bg-[#20252C] hover:bg-[#282F38] text-[#5B8DEF] border border-[#282F38] font-bold py-3.5 px-4 rounded-2xl transition-all text-xs cursor-pointer"
           title="Desmarca los ejercicios completados pero conserva tus pesos para la siguiente semana"
         >
-          Iniciar nueva semana (conserva pesos)
+          Pasar a la semana siguiente
         </button>
 
         <button
           onClick={handleRegenerateRoutine}
-          className="bg-zinc-100 hover:bg-zinc-200 text-zinc-600 font-bold py-3.5 px-4 rounded-2xl transition-all text-xs flex items-center justify-center gap-1.5"
+          className="bg-[#20252C] hover:bg-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED] border border-[#282F38] font-bold py-3.5 px-4 rounded-2xl transition-all text-xs flex items-center justify-center gap-1.5 cursor-pointer"
           title="Regenera toda la rutina de 4 días para comenzar un nuevo mesociclo"
         >
           <RotateCcw className="w-3.5 h-3.5" />
-          <span>Regenerar mesociclo</span>
+          <span>Crear bloque nuevo</span>
         </button>
       </div>
 
-      {/* MODAL PARA SUSTITUIR UN EJERCICIO INDIVIDUAL */}
-      {swapModalState && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl p-6 max-w-lg w-full border border-zinc-200 shadow-2xl animate-fadeIn">
-            <div className="flex items-center justify-between border-b border-zinc-100 pb-3 mb-4">
+      {/* MODAL PARA EDITAR PLAN */}
+      {showEditPlanModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#20252C] rounded-3xl p-6 max-w-md w-full border border-[#282F38] shadow-2xl text-[#F4F2ED] space-y-5">
+            <div className="flex items-center justify-between border-b border-[#282F38] pb-3">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
-                  Sustitución en Gimnasio
-                </span>
-                <h3 className="text-base font-black text-zinc-900 mt-1">
-                  Elegir alternativa para este ejercicio
-                </h3>
-                <p className="text-xs text-zinc-500">
-                  Actual: <span className="font-bold text-zinc-800">{swapModalState.currentName}</span>
-                </p>
+                <h3 className="text-base font-black text-white">Editar plan de entrenamiento</h3>
+                <p className="text-xs text-[#A8B0BB]">Ajusta la estructura de tu mesociclo</p>
               </div>
               <button
-                onClick={() => setSwapModalState(null)}
-                className="p-1.5 hover:bg-zinc-100 rounded-xl text-zinc-400 hover:text-zinc-700"
+                onClick={() => setShowEditPlanModal(false)}
+                className="p-1.5 hover:bg-[#15181D] rounded-xl text-[#A8B0BB] hover:text-white cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <p className="text-xs text-zinc-600 mb-3 leading-relaxed">
-              Elige otra máquina o ejercicio equivalente para el mismo grupo muscular. El resto de tu rutina de 2 meses permanecerá intacta:
+            {/* Días por semana */}
+            <div>
+              <label className="text-xs font-bold text-[#A8B0BB] block mb-2">Días de entrenamiento por semana</label>
+              <div className="grid grid-cols-3 gap-2">
+                {([3, 4, 5] as const).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setTempPlanDays(d)}
+                    className={`p-3 rounded-2xl border text-center transition-all cursor-pointer ${
+                      tempPlanDays === d
+                        ? 'bg-[#5B8DEF]/15 border-[#5B8DEF] text-white font-black'
+                        : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white'
+                    }`}
+                  >
+                    <div className="text-sm font-black">{d} días</div>
+                    <div className="text-[10px] opacity-75">{d === 3 ? 'Full Body' : d === 4 ? 'Torso/Pierna' : 'Frecuencia alta'}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Enfoque del bloque */}
+            <div>
+              <label className="text-xs font-bold text-[#A8B0BB] block mb-2">Enfoque muscular</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTempPlanFocus('standard')}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                    tempPlanFocus === 'standard'
+                      ? 'bg-[#1FD08A]/15 border-[#1FD08A] text-white font-black'
+                      : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white'
+                  }`}
+                >
+                  <div className="text-xs font-black">Estándar</div>
+                  <div className="text-[10px] opacity-75">Torso / Pierna equilibrado</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTempPlanFocus('glutes')}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer ${
+                    tempPlanFocus === 'glutes'
+                      ? 'bg-purple-500/15 border-purple-500 text-white font-black'
+                      : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white'
+                  }`}
+                >
+                  <div className="text-xs font-black">Glúteos & Pierna</div>
+                  <div className="text-[10px] opacity-75">Énfasis cadena posterior</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Duración del bloque */}
+            <div>
+              <label className="text-xs font-bold text-[#A8B0BB] block mb-2">Duración del bloque</label>
+              <div className="grid grid-cols-4 gap-2">
+                {[4, 6, 8, 12].map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => setTempPlanTargetWeeks(w)}
+                    className={`py-2 px-1 rounded-xl border text-center text-xs transition-all cursor-pointer ${
+                      tempPlanTargetWeeks === w
+                        ? 'bg-[#1FD08A] border-[#1FD08A] text-[#15181D] font-black'
+                        : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white'
+                    }`}
+                  >
+                    {w} sem
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Semana actual */}
+            <div>
+              <label className="text-xs font-bold text-[#A8B0BB] block mb-2">
+                Semana activa: <span className="text-[#1FD08A] font-mono">Semana {tempPlanCurrentWeek}</span> de {tempPlanTargetWeeks}
+              </label>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {Array.from({ length: tempPlanTargetWeeks }, (_, i) => i + 1).map((w) => (
+                  <button
+                    key={w}
+                    type="button"
+                    onClick={() => setTempPlanCurrentWeek(w)}
+                    className={`w-8 h-8 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center ${
+                      tempPlanCurrentWeek === w
+                        ? 'bg-[#5B8DEF] border-[#5B8DEF] text-white'
+                        : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white'
+                    }`}
+                  >
+                    {w}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-[#282F38]">
+              <button
+                type="button"
+                onClick={() => setShowEditPlanModal(false)}
+                className="px-4 py-2.5 bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] hover:text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSavePlanEdits}
+                className="px-5 py-2.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs transition-all shadow-md cursor-pointer"
+              >
+                Guardar cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA SUSTITUIR UN EJERCICIO INDIVIDUAL */}
+      {swapModalState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#20252C] rounded-3xl p-6 max-w-lg w-full border border-[#282F38] shadow-2xl text-[#F4F2ED]">
+            <div className="flex items-center justify-between border-b border-[#282F38] pb-3 mb-4">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A] bg-[#1FD08A]/15 px-2 py-0.5 rounded-full">
+                  Sustitución en gimnasio
+                </span>
+                <h3 className="text-base font-black text-white mt-1">
+                  Elegir alternativa para este ejercicio
+                </h3>
+                <p className="text-xs text-[#A8B0BB]">
+                  Actual: <span className="font-bold text-white">{swapModalState.currentName}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setSwapModalState(null)}
+                className="p-1.5 hover:bg-[#15181D] rounded-xl text-[#A8B0BB] hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#A8B0BB] mb-3 leading-relaxed">
+              Elige otra máquina o ejercicio equivalente para el mismo grupo muscular. El resto de tu mesociclo permanecerá intacto:
             </p>
 
             <div className="space-y-2 mb-5 max-h-72 overflow-y-auto">
@@ -1352,23 +1448,23 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
                     key={alt.name}
                     onClick={() => handleSwapExercise(alt)}
                     disabled={isSelected}
-                    className={`w-full text-left p-3 rounded-2xl border transition-all flex items-center justify-between ${
+                    className={`w-full text-left p-3 rounded-2xl border transition-all flex items-center justify-between cursor-pointer ${
                       isSelected
-                        ? 'bg-zinc-100 border-zinc-300 opacity-60 cursor-not-allowed'
-                        : 'bg-zinc-50 hover:bg-emerald-50/50 hover:border-emerald-300 border-zinc-200'
+                        ? 'bg-[#15181D] border-[#282F38] opacity-50 cursor-not-allowed'
+                        : 'bg-[#15181D] hover:bg-[#282F38] hover:border-[#1FD08A]/40 border-[#282F38]'
                     }`}
                   >
                     <div>
-                      <p className="font-extrabold text-xs text-zinc-900">{alt.name}</p>
-                      <p className="text-[11px] text-zinc-500 mt-0.5">{alt.description}</p>
-                      <span className="inline-block mt-1 text-[10px] font-bold text-zinc-400">
-                        {alt.defaultSets}× {alt.defaultReps}
+                      <p className="font-extrabold text-xs text-white">{alt.name}</p>
+                      <p className="text-[11px] text-[#A8B0BB] mt-0.5">{alt.description}</p>
+                      <span className="inline-block mt-1 text-[10px] font-bold text-[#A8B0BB] font-mono">
+                        {alt.defaultSets} series × {alt.defaultReps} reps
                       </span>
                     </div>
                     {isSelected ? (
-                      <span className="text-[10px] font-bold text-zinc-400">Actual</span>
+                      <span className="text-[10px] font-bold text-[#A8B0BB]">Actual</span>
                     ) : (
-                      <ChevronRight className="w-4 h-4 text-emerald-600 shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-[#1FD08A] shrink-0" />
                     )}
                   </button>
                 );
@@ -1378,7 +1474,7 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
             <div className="flex justify-end">
               <button
                 onClick={() => setSwapModalState(null)}
-                className="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold rounded-xl text-xs"
+                className="px-4 py-2 bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] hover:text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
               >
                 Cancelar
               </button>

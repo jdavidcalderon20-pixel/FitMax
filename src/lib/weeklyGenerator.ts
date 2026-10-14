@@ -1350,8 +1350,18 @@ export const generateWeeklyRoutine = (
           { category: 'Bisagra de Cadera (Isquios/Glúteo)', name: fb1_4.name, defaultSets: 3, defaultReps: fb1_4.reps, description: fb1_4.desc },
           { category: 'Core / Abdomen Estable', name: fb1_5.name, defaultSets: 3, defaultReps: fb1_5.reps, description: fb1_5.desc }
         ],
-        amrapComplementary: am1_comp,
-        amrapActivator: am1_act
+        amrapComplementary: {
+          name: am1_comp.name,
+          durationMinutes: 5,
+          exercises: am1_comp.exercises,
+          instructions: am1_comp.instructions
+        },
+        amrapActivator: {
+          name: am1_act.name,
+          durationMinutes: 5,
+          exercises: am1_act.exercises,
+          instructions: am1_act.instructions
+        }
       },
       2: {
         id: 2,
