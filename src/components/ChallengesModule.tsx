@@ -251,38 +251,38 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
     <div className="flex flex-col h-full space-y-6 animate-fadeIn">
       
       {/* HEADER PRINCIPAL */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-100 pb-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#282F38] pb-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="bg-amber-100 text-amber-900 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-1 border border-amber-300">
-              <Trophy className="w-3 h-3 text-amber-600" /> Sistema de Élite & Gamificación
+            <span className="bg-[#20252C] text-amber-400 px-3 py-0.5 rounded-full text-[10px] font-bold inline-flex items-center gap-1.5 border border-[#282F38]">
+              <Trophy className="w-3 h-3 text-amber-500" /> Medallas y retos
             </span>
-            <span className="text-zinc-400 text-xs font-bold">
-              {unlockedBadgesCount} / {totalBadgesCount} Desbloqueadas
+            <span className="text-[#A8B0BB] text-xs font-semibold">
+              {unlockedBadgesCount} / {totalBadgesCount} conseguidas
             </span>
           </div>
-          <h2 className="text-xl md:text-2xl font-black tracking-tight text-zinc-900 flex items-center gap-2">
-            <Award className="w-6 h-6 text-amber-500" />
-            Salón de Medallas y Retos Mensuales
+          <h2 className="text-xl md:text-2xl font-black tracking-tight text-[#F4F2ED] flex items-center gap-2">
+            <Award className="w-6 h-6 text-amber-400" />
+            Salón de medallas y retos mensuales
           </h2>
-          <p className="text-zinc-500 text-xs mt-0.5">
-            Gana insignias atléticas con base científica por tu constancia, récords de fuerza, rodajes en Zona 2 y pruebas Hyrox/OCR.
+          <p className="text-[#A8B0BB] text-xs mt-0.5">
+            Gana insignias atléticas con base científica por tu constancia, marcas de fuerza, rodajes en Zona 2 y pruebas Hyrox/OCR.
           </p>
         </div>
 
         {/* BOTÓN SINCRONIZAR PROGRESO */}
         <button
           onClick={handleRefresh}
-          className="bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm"
+          className="bg-[#20252C] hover:bg-[#282F38] text-[#F4F2ED] border border-[#282F38] font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
           title="Recalcular con tus últimos entrenamientos registrados"
         >
-          <RotateCcw className="w-3.5 h-3.5 text-zinc-500" />
-          <span>Actualizar Progreso</span>
+          <RotateCcw className="w-3.5 h-3.5 text-[#A8B0BB]" />
+          <span>Actualizar progreso</span>
         </button>
       </div>
 
       {/* BANNER SUPERIOR DE RANGO Y MAESTRÍA ATLÉTICA */}
-      <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 border border-zinc-800 rounded-3xl p-5 md:p-6 text-white shadow-xl relative overflow-hidden">
+      <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-5 md:p-6 text-[#F4F2ED] shadow-xl relative overflow-hidden">
         {/* Luz de fondo ambiental */}
         <div className="absolute top-0 right-0 w-72 h-72 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -304,15 +304,15 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
 
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-800/60">
-                  Rango del Atleta
+                <span className="text-[10px] font-bold text-[#1FD08A] bg-[#1FD08A]/10 px-2.5 py-0.5 rounded-md border border-[#1FD08A]/30">
+                  Rango del atleta
                 </span>
-                <span className="text-xs text-zinc-400 font-bold">Perfil: {nickname}</span>
+                <span className="text-xs text-[#A8B0BB] font-semibold">Perfil: {nickname}</span>
               </div>
-              <h3 className="text-xl md:text-2xl font-black tracking-tight text-white mt-0.5">
+              <h3 className="text-xl md:text-2xl font-black tracking-tight text-[#F4F2ED] mt-0.5">
                 {athleteRank.title}
               </h3>
-              <p className="text-xs text-zinc-400 mt-0.5">
+              <p className="text-xs text-[#A8B0BB] mt-0.5">
                 Has completado el <strong className="text-amber-400">{masteryPercentage}%</strong> de las condecoraciones atléticas disponibles.
               </p>
             </div>
@@ -321,38 +321,38 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
           {/* Barra de progreso global y resumen por tier */}
           <div className="w-full lg:w-80 flex flex-col gap-2">
             <div className="flex justify-between items-center text-xs font-bold">
-              <span className="text-zinc-300">Maestría Global</span>
-              <span className="text-amber-400">{unlockedBadgesCount} / {totalBadgesCount} Medallas</span>
+              <span className="text-[#A8B0BB]">Maestría global</span>
+              <span className="text-amber-400">{unlockedBadgesCount} / {totalBadgesCount} medallas</span>
             </div>
             
-            <div className="w-full bg-zinc-800/90 h-3 rounded-full overflow-hidden p-0.5 border border-zinc-700">
+            <div className="w-full bg-[#15181D] h-3 rounded-full overflow-hidden p-0.5 border border-[#282F38]">
               <div 
-                className="bg-gradient-to-r from-amber-500 via-emerald-400 to-cyan-400 h-full rounded-full transition-all duration-700 shadow-[0_0_12px_rgba(251,191,36,0.5)]"
+                className="bg-gradient-to-r from-amber-500 via-[#1FD08A] to-cyan-400 h-full rounded-full transition-all duration-700 shadow-[0_0_12px_rgba(251,191,36,0.5)]"
                 style={{ width: `${masteryPercentage}%` }}
               />
             </div>
 
             <div className="grid grid-cols-4 gap-1 text-center mt-1">
-              <div className="bg-zinc-900/90 border border-amber-900/40 rounded-lg py-1 px-1">
-                <span className="text-[9px] text-amber-600 block uppercase font-bold">Bronce</span>
+              <div className="bg-[#15181D] border border-amber-900/40 rounded-lg py-1 px-1">
+                <span className="text-[9px] text-amber-500 block font-bold">Bronce</span>
                 <span className="text-xs font-black text-amber-400">
                   {badges.filter((b) => b.tier === 'bronze' && b.isUnlocked).length} / {badges.filter((b) => b.tier === 'bronze').length}
                 </span>
               </div>
-              <div className="bg-zinc-900/90 border border-slate-700/50 rounded-lg py-1 px-1">
-                <span className="text-[9px] text-slate-400 block uppercase font-bold">Plata</span>
+              <div className="bg-[#15181D] border border-slate-700/50 rounded-lg py-1 px-1">
+                <span className="text-[9px] text-slate-400 block font-bold">Plata</span>
                 <span className="text-xs font-black text-slate-200">
                   {badges.filter((b) => b.tier === 'silver' && b.isUnlocked).length} / {badges.filter((b) => b.tier === 'silver').length}
                 </span>
               </div>
-              <div className="bg-zinc-900/90 border border-amber-500/40 rounded-lg py-1 px-1">
-                <span className="text-[9px] text-yellow-500 block uppercase font-bold">Oro</span>
+              <div className="bg-[#15181D] border border-amber-500/40 rounded-lg py-1 px-1">
+                <span className="text-[9px] text-yellow-400 block font-bold">Oro</span>
                 <span className="text-xs font-black text-yellow-300">
                   {badges.filter((b) => b.tier === 'gold' && b.isUnlocked).length} / {badges.filter((b) => b.tier === 'gold').length}
                 </span>
               </div>
-              <div className="bg-zinc-900/90 border border-cyan-500/40 rounded-lg py-1 px-1">
-                <span className="text-[9px] text-cyan-400 block uppercase font-bold">Titanio</span>
+              <div className="bg-[#15181D] border border-cyan-500/40 rounded-lg py-1 px-1">
+                <span className="text-[9px] text-cyan-400 block font-bold">Titanio</span>
                 <span className="text-xs font-black text-cyan-300">
                   {badges.filter((b) => b.tier === 'titanium' && b.isUnlocked).length} / {badges.filter((b) => b.tier === 'titanium').length}
                 </span>
@@ -363,31 +363,31 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
       </div>
 
       {/* TABS DE SUB-SECCIÓN: MURO DE MEDALLAS VS RETOS MENSUALES */}
-      <div className="flex items-center gap-2 border-b border-zinc-200 pb-2">
+      <div className="flex items-center gap-2 border-b border-[#282F38] pb-2">
         <button
           onClick={() => setActiveTab('hall')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'hall'
-              ? 'bg-zinc-900 text-white shadow-md'
-              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+              ? 'bg-[#1FD08A] text-[#15181D] shadow-sm'
+              : 'text-[#A8B0BB] hover:text-[#F4F2ED] hover:bg-[#20252C]'
           }`}
         >
-          <Trophy className="w-4 h-4 text-amber-400" />
-          <span>Salón de Trofeos ({badges.length})</span>
+          <Trophy className="w-4 h-4 text-amber-500" />
+          <span>Salón de medallas ({badges.length})</span>
         </button>
 
         <button
           onClick={() => setActiveTab('challenges')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all relative ${
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold transition-all cursor-pointer relative ${
             activeTab === 'challenges'
-              ? 'bg-zinc-900 text-white shadow-md'
-              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
+              ? 'bg-[#1FD08A] text-[#15181D] shadow-sm'
+              : 'text-[#A8B0BB] hover:text-[#F4F2ED] hover:bg-[#20252C]'
           }`}
         >
           <Target className="w-4 h-4 text-emerald-400" />
-          <span>Retos de Comunidad ({challenges.length})</span>
+          <span>Retos de la comunidad ({challenges.length})</span>
           {joinedChallengeIds.length > 0 && (
-            <span className="bg-emerald-500 text-zinc-950 text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ml-1">
+            <span className="bg-[#15181D] text-[#1FD08A] text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ml-1 border border-[#1FD08A]/40">
               {joinedChallengeIds.length} activos
             </span>
           )}
@@ -400,21 +400,21 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
           
           {/* BARRA DE FILTROS POR CATEGORÍA */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            <span className="text-xs text-zinc-400 font-bold mr-1">Filtrar:</span>
+            <span className="text-xs text-[#A8B0BB] font-semibold mr-1">Filtrar:</span>
             {[
-              { id: 'all', label: 'Todas las Medallas' },
-              { id: 'strength', label: 'Fuerza & Mesociclo' },
+              { id: 'all', label: 'Todas las medallas' },
+              { id: 'strength', label: 'Fuerza & mesociclo' },
               { id: 'running', label: 'Running & Z2' },
-              { id: 'hybrid', label: 'Hyrox & Agarre OCR' },
+              { id: 'hybrid', label: 'Hyrox & agarre OCR' },
               { id: 'consistency', label: 'Constancia' }
             ].map((f) => (
               <button
                 key={f.id}
                 onClick={() => setSelectedCategory(f.id as BadgeCategory | 'all')}
-                className={`text-xs px-3 py-1.5 rounded-xl font-bold transition-all ${
+                className={`text-xs px-3 py-1.5 rounded-xl font-semibold transition-all cursor-pointer ${
                   selectedCategory === f.id
-                    ? 'bg-amber-500 text-zinc-950 shadow-sm'
-                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                    ? 'bg-[#1FD08A] text-[#15181D] shadow-sm'
+                    : 'bg-[#20252C] border border-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED] hover:border-[#38414D]'
                 }`}
               >
                 {f.label}
@@ -422,7 +422,7 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
             ))}
           </div>
 
-          {/* GRID DE MEDALLAS */}
+          {/* GRID DE MEDALLAS (ALTO CONTRASTE) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredBadges.map((badge) => {
               const tierStyle = BADGE_TIER_STYLES[badge.tier];
@@ -430,11 +430,16 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
               return (
                 <div
                   key={badge.id}
-                  onClick={() => setInspectedBadge(badge)}
-                  className={`cursor-pointer rounded-3xl p-5 border transition-all duration-300 relative flex flex-col justify-between overflow-hidden group hover:scale-[1.02] shadow-sm ${
+                  onClick={() => {
+                    if (badge.isUnlocked) {
+                      playBeepSound();
+                    }
+                    setInspectedBadge(badge);
+                  }}
+                  className={`cursor-pointer rounded-2xl p-5 border transition-all duration-200 relative flex flex-col justify-between overflow-hidden group shadow-sm hover:border-[#38414D] ${
                     badge.isUnlocked
-                      ? `bg-gradient-to-br ${tierStyle.bg} ${tierStyle.border} hover:shadow-lg`
-                      : 'bg-zinc-950/70 border-zinc-800 hover:border-zinc-700 opacity-90'
+                      ? `bg-gradient-to-br ${tierStyle.bg} ${tierStyle.border}`
+                      : 'bg-[#20252C] border-[#282F38]'
                   }`}
                 >
                   {/* Resplandor decorativo si está desbloqueada */}
@@ -445,7 +450,7 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
                   <div>
                     {/* Fila superior: Categoría, Tier y Estado */}
                     <div className="flex items-center justify-between gap-2 mb-3">
-                      <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
+                      <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                         badge.tier === 'titanium'
                           ? 'bg-cyan-950/80 text-cyan-300 border-cyan-800'
                           : badge.tier === 'gold'
@@ -454,37 +459,35 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
                           ? 'bg-slate-800/80 text-slate-300 border-slate-700'
                           : 'bg-amber-950/80 text-amber-400 border-amber-800'
                       }`}>
-                        {badge.tier.toUpperCase()}
+                        {badge.tier.charAt(0).toUpperCase() + badge.tier.slice(1)}
                       </span>
 
                       {badge.isUnlocked ? (
-                        <span className="flex items-center gap-1 text-[10px] font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
-                          <CheckCircle className="w-3 h-3" /> CONSEGUIDA
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-[#1FD08A] bg-[#1FD08A]/10 px-2 py-0.5 rounded-full border border-[#1FD08A]/30">
+                          <CheckCircle className="w-3 h-3" /> Conseguida
                         </span>
                       ) : (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-zinc-400 bg-zinc-900 px-2 py-0.5 rounded-full border border-zinc-800">
-                          <Lock className="w-3 h-3 text-zinc-500" /> EN CURSO
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-[#A8B0BB] bg-[#15181D] px-2 py-0.5 rounded-full border border-[#282F38]">
+                          <Lock className="w-3 h-3 text-zinc-400" /> En curso
                         </span>
                       )}
                     </div>
 
                     {/* Icono y Título */}
                     <div className="flex items-center gap-3.5 mb-2.5">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center p-2.5 border transition-all ${
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center p-2.5 border transition-all shrink-0 ${
                         badge.isUnlocked
-                          ? `bg-zinc-900 ${tierStyle.border} ${tierStyle.text} shadow-md`
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-600'
+                          ? `bg-[#15181D] ${tierStyle.border} ${tierStyle.text} shadow-sm`
+                          : 'bg-[#15181D] border-[#282F38] text-zinc-400'
                       }`}>
                         {renderBadgeIcon(badge.iconName, 'w-6 h-6')}
                       </div>
 
                       <div>
-                        <h4 className={`text-base font-black tracking-tight leading-snug ${
-                          badge.isUnlocked ? 'text-white' : 'text-zinc-200'
-                        }`}>
+                        <h4 className="text-base font-black tracking-tight leading-snug text-[#F4F2ED]">
                           {badge.title}
                         </h4>
-                        <p className="text-[11px] text-zinc-400 leading-tight mt-0.5 line-clamp-2">
+                        <p className="text-[11px] text-[#A8B0BB] leading-tight mt-0.5 line-clamp-2">
                           {badge.description}
                         </p>
                       </div>
@@ -492,28 +495,28 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
                   </div>
 
                   {/* Barra de progreso de la medalla */}
-                  <div className="mt-4 pt-3 border-t border-zinc-800/60">
+                  <div className="mt-4 pt-3 border-t border-[#282F38]">
                     <div className="flex justify-between items-center text-[11px] font-bold mb-1.5">
-                      <span className="text-zinc-400">{badge.progressLabel}</span>
-                      <span className={badge.isUnlocked ? 'text-emerald-400' : 'text-zinc-300'}>
+                      <span className="text-[#A8B0BB]">{badge.progressLabel}</span>
+                      <span className={badge.isUnlocked ? 'text-[#1FD08A]' : 'text-[#F4F2ED]'}>
                         {badge.progress}%
                       </span>
                     </div>
 
-                    <div className="w-full bg-zinc-900 h-2 rounded-full overflow-hidden border border-zinc-800">
+                    <div className="w-full bg-[#15181D] h-2 rounded-full overflow-hidden border border-[#282F38]">
                       <div
                         className={`h-full rounded-full transition-all duration-500 ${
                           badge.isUnlocked
-                            ? 'bg-gradient-to-r from-amber-400 to-emerald-400'
-                            : 'bg-zinc-600'
+                            ? 'bg-gradient-to-r from-amber-400 to-[#1FD08A]'
+                            : 'bg-[#1FD08A]'
                         }`}
                         style={{ width: `${badge.progress}%` }}
                       />
                     </div>
 
-                    <div className="mt-2.5 flex items-center justify-between text-[10px] text-zinc-400 group-hover:text-amber-400 transition-colors">
-                      <span className="flex items-center gap-1 font-semibold">
-                        <Info className="w-3 h-3" /> Ver base científica & consejos
+                    <div className="mt-2.5 flex items-center justify-between text-[11px] text-[#A8B0BB] group-hover:text-[#1FD08A] transition-colors">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <Info className="w-3.5 h-3.5 text-[#1FD08A]" /> ¿Por qué esta medalla?
                       </span>
                       <ChevronRight className="w-3.5 h-3.5 transform group-hover:translate-x-1 transition-transform" />
                     </div>
@@ -529,11 +532,11 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
       {activeTab === 'challenges' && (
         <div className="space-y-4">
           
-          <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3 text-emerald-950">
-            <Target className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+          <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-4 flex items-start gap-3 text-[#F4F2ED]">
+            <Target className="w-5 h-5 text-[#1FD08A] shrink-0 mt-0.5" />
             <div className="text-xs leading-relaxed">
-              <p className="font-extrabold text-sm mb-0.5">Retos Activos de la Comunidad</p>
-              <p className="text-emerald-800">
+              <p className="font-extrabold text-sm mb-0.5 text-[#F4F2ED]">Retos activos de la comunidad</p>
+              <p className="text-[#A8B0BB]">
                 Inscríbete a cualquiera de los retos para conectar tus sesiones automáticamente. Cada meta alcanzada desbloqueará su respectiva insignia atlética de honor.
               </p>
             </div>
@@ -544,51 +547,51 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
               return (
                 <div
                   key={challenge.id}
-                  className={`rounded-3xl p-5 border transition-all bg-zinc-950 text-white flex flex-col justify-between shadow-md relative overflow-hidden ${
+                  className={`rounded-2xl p-5 border transition-all bg-[#20252C] text-[#F4F2ED] flex flex-col justify-between shadow-md relative overflow-hidden ${
                     challenge.isCompleted
-                      ? 'border-emerald-500 ring-1 ring-emerald-500/40'
+                      ? 'border-[#1FD08A] ring-1 ring-[#1FD08A]/40'
                       : challenge.isJoined
-                      ? 'border-zinc-700 bg-zinc-900'
-                      : 'border-zinc-800'
+                      ? 'border-[#38414D]'
+                      : 'border-[#282F38]'
                   }`}
                 >
                   <div>
                     {/* Cabecera del reto */}
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="flex items-center gap-1 text-[10px] font-black uppercase tracking-wider bg-zinc-800 text-zinc-300 px-2.5 py-0.5 rounded-full border border-zinc-700">
+                      <span className="flex items-center gap-1 text-[10px] font-bold bg-[#15181D] text-[#A8B0BB] px-2.5 py-0.5 rounded-full border border-[#282F38]">
                         <Clock className="w-3 h-3 text-amber-400" />
                         {challenge.daysLeft} días restantes
                       </span>
 
                       {challenge.isCompleted ? (
-                        <span className="bg-emerald-500 text-zinc-950 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                          <Check className="w-3 h-3" /> COMPLETADO
+                        <span className="bg-[#1FD08A] text-[#15181D] text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          <Check className="w-3 h-3" /> Completado
                         </span>
                       ) : challenge.isJoined ? (
-                        <span className="bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-black px-2.5 py-0.5 rounded-full flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" /> INSCRITO
+                        <span className="bg-[#1FD08A]/10 text-[#1FD08A] border border-[#1FD08A]/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                          <Sparkles className="w-3 h-3" /> Inscrito
                         </span>
                       ) : (
-                        <span className="bg-zinc-800 text-zinc-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                        <span className="bg-[#15181D] text-[#A8B0BB] text-[10px] font-semibold px-2 py-0.5 rounded-full border border-[#282F38]">
                           Abierto a inscripción
                         </span>
                       )}
                     </div>
 
-                    <h3 className="text-lg font-black tracking-tight text-white mb-1">
+                    <h3 className="text-lg font-black tracking-tight text-[#F4F2ED] mb-1">
                       {challenge.title}
                     </h3>
-                    <p className="text-xs text-zinc-400 leading-relaxed mb-4">
+                    <p className="text-xs text-[#A8B0BB] leading-relaxed mb-4">
                       {challenge.description}
                     </p>
 
                     {/* Recompensa */}
-                    <div className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-3 flex items-center gap-3 mb-4">
+                    <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3 flex items-center gap-3 mb-4">
                       <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0">
                         <Trophy className="w-5 h-5" />
                       </div>
                       <div>
-                        <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest block">
+                        <span className="text-[10px] font-bold text-[#A8B0BB] block">
                           Recompensa al completar:
                         </span>
                         <span className="text-xs font-black text-amber-300">
@@ -601,20 +604,20 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
                   {/* Progreso del reto */}
                   <div>
                     <div className="flex justify-between items-center text-xs font-bold mb-1.5">
-                      <span className="text-zinc-400">
-                        Progreso: <strong className="text-white">{challenge.currentValue}</strong> / {challenge.targetValue} {challenge.unit}
+                      <span className="text-[#A8B0BB]">
+                        Progreso: <strong className="text-[#F4F2ED]">{challenge.currentValue}</strong> / {challenge.targetValue} {challenge.unit}
                       </span>
-                      <span className={challenge.isCompleted ? 'text-emerald-400' : 'text-amber-400'}>
+                      <span className={challenge.isCompleted ? 'text-[#1FD08A]' : 'text-amber-400'}>
                         {challenge.progress}%
                       </span>
                     </div>
 
-                    <div className="w-full bg-zinc-900 h-2.5 rounded-full overflow-hidden border border-zinc-800 mb-4">
+                    <div className="w-full bg-[#15181D] h-2.5 rounded-full overflow-hidden border border-[#282F38] mb-4">
                       <div
                         className={`h-full rounded-full transition-all duration-700 ${
                           challenge.isCompleted
-                            ? 'bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.5)]'
-                            : 'bg-gradient-to-r from-amber-500 to-emerald-400'
+                            ? 'bg-[#1FD08A] shadow-[0_0_10px_rgba(31,208,138,0.5)]'
+                            : 'bg-gradient-to-r from-amber-500 to-[#1FD08A]'
                         }`}
                         style={{ width: `${challenge.progress}%` }}
                       />
@@ -624,28 +627,28 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleToggleJoinChallenge(challenge.id)}
-                        className={`w-full py-2.5 px-4 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all ${
+                        className={`w-full py-2.5 px-4 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer ${
                           challenge.isCompleted
-                            ? 'bg-emerald-500 text-zinc-950 hover:bg-emerald-400 shadow-md'
+                            ? 'bg-[#1FD08A] text-[#15181D] hover:bg-[#1bc07e] shadow-md'
                             : challenge.isJoined
-                            ? 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700'
-                            : 'bg-emerald-500 hover:bg-emerald-400 text-zinc-950 shadow-md hover:shadow-emerald-500/20'
+                            ? 'bg-[#15181D] hover:bg-[#20252C] text-[#F4F2ED] border border-[#282F38]'
+                            : 'bg-[#1FD08A] hover:bg-[#1bc07e] text-[#15181D] shadow-md'
                         }`}
                       >
                         {challenge.isCompleted ? (
                           <>
                             <Trophy className="w-4 h-4" />
-                            <span>¡Objetivo Conquistado!</span>
+                            <span>¡Objetivo conquistado!</span>
                           </>
                         ) : challenge.isJoined ? (
                           <>
-                            <CheckCircle className="w-4 h-4 text-emerald-400" />
-                            <span>Inscrito (Haz clic para salir)</span>
+                            <CheckCircle className="w-4 h-4 text-[#1FD08A]" />
+                            <span>Inscrito (haz clic para salir)</span>
                           </>
                         ) : (
                           <>
                             <Target className="w-4 h-4" />
-                            <span>Unirme al Reto</span>
+                            <span>Unirme al reto</span>
                           </>
                         )}
                       </button>
@@ -661,12 +664,12 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
       {/* MODAL DE DETALLE BIOMECÁNICO Y CIENTÍFICO DE MEDALLA */}
       {inspectedBadge && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl max-w-lg w-full p-6 text-white shadow-2xl relative">
+          <div className="bg-[#20252C] border border-[#282F38] rounded-3xl max-w-lg w-full p-6 text-[#F4F2ED] shadow-2xl relative">
             
             {/* Botón Cerrar */}
             <button
               onClick={() => setInspectedBadge(null)}
-              className="absolute top-4 right-4 p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-xl transition-colors"
+              className="absolute top-4 right-4 p-2 bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED] rounded-xl transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
@@ -676,13 +679,13 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
               <div className={`w-20 h-20 rounded-3xl flex items-center justify-center p-4 mb-3 border shadow-2xl ${
                 inspectedBadge.isUnlocked
                   ? `${BADGE_TIER_STYLES[inspectedBadge.tier].bg} ${BADGE_TIER_STYLES[inspectedBadge.tier].border} ${BADGE_TIER_STYLES[inspectedBadge.tier].text} ring-4 ${BADGE_TIER_STYLES[inspectedBadge.tier].ring}`
-                  : 'bg-zinc-900 border-zinc-800 text-zinc-600'
+                  : 'bg-[#15181D] border-[#282F38] text-zinc-500'
               }`}>
                 {renderBadgeIcon(inspectedBadge.iconName, 'w-10 h-10')}
               </div>
 
               <div className="flex items-center gap-2 mb-1">
-                <span className={`text-[10px] font-black uppercase tracking-widest px-2.5 py-0.5 rounded-full border ${
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full border ${
                   inspectedBadge.tier === 'titanium'
                     ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
                     : inspectedBadge.tier === 'gold'
@@ -691,42 +694,42 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
                     ? 'bg-slate-800 text-slate-300 border-slate-700'
                     : 'bg-amber-950 text-amber-500 border-amber-800'
                 }`}>
-                  Metal: {inspectedBadge.tier.toUpperCase()}
+                  Nivel: {inspectedBadge.tier.charAt(0).toUpperCase() + inspectedBadge.tier.slice(1)}
                 </span>
                 
                 {inspectedBadge.isUnlocked ? (
-                  <span className="text-[10px] font-black text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded-full border border-emerald-800 flex items-center gap-1">
+                  <span className="text-[10px] font-bold text-[#1FD08A] bg-[#1FD08A]/10 px-2.5 py-0.5 rounded-full border border-[#1FD08A]/30 flex items-center gap-1">
                     <CheckCircle className="w-3 h-3" /> Desbloqueada
                   </span>
                 ) : (
-                  <span className="text-[10px] font-black text-zinc-400 bg-zinc-900 px-2 py-0.5 rounded-full border border-zinc-800 flex items-center gap-1">
-                    <Lock className="w-3 h-3" /> En progreso
+                  <span className="text-[10px] font-bold text-[#A8B0BB] bg-[#15181D] px-2.5 py-0.5 rounded-full border border-[#282F38] flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-zinc-400" /> En curso
                   </span>
                 )}
               </div>
 
-              <h3 className="text-xl font-black tracking-tight text-white mt-1">
+              <h3 className="text-xl font-black tracking-tight text-[#F4F2ED] mt-1">
                 {inspectedBadge.title}
               </h3>
-              <p className="text-xs text-zinc-400 max-w-sm mt-1">
+              <p className="text-xs text-[#A8B0BB] max-w-sm mt-1">
                 {inspectedBadge.description}
               </p>
             </div>
 
             {/* Progreso intra-medalla */}
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 mb-4">
+            <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-4 mb-4">
               <div className="flex justify-between items-center text-xs font-bold mb-1.5">
-                <span className="text-zinc-400">Progreso actual: {inspectedBadge.progressLabel}</span>
-                <span className={inspectedBadge.isUnlocked ? 'text-emerald-400' : 'text-amber-400'}>
+                <span className="text-[#A8B0BB]">Progreso actual: {inspectedBadge.progressLabel}</span>
+                <span className={inspectedBadge.isUnlocked ? 'text-[#1FD08A]' : 'text-amber-400'}>
                   {inspectedBadge.progress}%
                 </span>
               </div>
-              <div className="w-full bg-zinc-950 h-2.5 rounded-full overflow-hidden border border-zinc-800">
+              <div className="w-full bg-[#20252C] h-2.5 rounded-full overflow-hidden border border-[#282F38]">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${
                     inspectedBadge.isUnlocked
-                      ? 'bg-gradient-to-r from-amber-400 to-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.4)]'
-                      : 'bg-zinc-600'
+                      ? 'bg-gradient-to-r from-amber-400 to-[#1FD08A] shadow-[0_0_8px_rgba(31,208,138,0.4)]'
+                      : 'bg-[#1FD08A]'
                   }`}
                   style={{ width: `${inspectedBadge.progress}%` }}
                 />
@@ -735,18 +738,18 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
 
             {/* Sección Científica y Consejo */}
             <div className="space-y-3 mb-6">
-              <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3.5">
-                <p className="text-[11px] font-black uppercase text-amber-400 tracking-wider flex items-center gap-1.5 mb-1">
-                  <Sparkles className="w-3.5 h-3.5" /> Relevancia Fisiológica & Científica
+              <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3.5">
+                <p className="text-[11px] font-bold uppercase text-[#1FD08A] tracking-wider flex items-center gap-1.5 mb-1">
+                  <Sparkles className="w-3.5 h-3.5 text-[#1FD08A]" /> ¿Por qué esta medalla?
                 </p>
                 <p className="text-xs text-zinc-300 leading-relaxed">
                   {BADGE_SCIENCE_DATA[inspectedBadge.id]?.science || 'Hito atlético estructurado para el desarrollo integral del rendimiento físico.'}
                 </p>
               </div>
 
-              <div className="bg-zinc-900/60 border border-zinc-800 rounded-2xl p-3.5">
-                <p className="text-[11px] font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1.5 mb-1">
-                  <Flame className="w-3.5 h-3.5" /> Consejo del Entrenador
+              <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3.5">
+                <p className="text-[11px] font-bold uppercase text-amber-400 tracking-wider flex items-center gap-1.5 mb-1">
+                  <Flame className="w-3.5 h-3.5 text-amber-400" /> Consejo del entrenador
                 </p>
                 <p className="text-xs text-zinc-300 leading-relaxed">
                   {BADGE_SCIENCE_DATA[inspectedBadge.id]?.coachTip || 'Mantén la disciplina en tus registros semanales para alcanzar este objetivo.'}
@@ -758,19 +761,19 @@ export default function ChallengesModule({ nickname, onNotification }: Challenge
             {inspectedBadge.isUnlocked && (
               <button
                 onClick={() => handleShareBadge(inspectedBadge)}
-                className="w-full py-3 bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-zinc-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-emerald-500/20 mb-2.5 active:scale-95"
+                className="w-full py-3 bg-[#1FD08A] hover:bg-[#1bc07e] text-[#15181D] font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md mb-2.5 active:scale-95"
               >
                 <Share2 className="w-4 h-4" />
-                <span>Presumir Medalla en WhatsApp 🔥</span>
+                <span>Presumir medalla en WhatsApp</span>
               </button>
             )}
 
             {/* Botón cerrar modal */}
             <button
               onClick={() => setInspectedBadge(null)}
-              className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white font-black rounded-xl text-xs transition-colors"
+              className="w-full py-3 bg-[#15181D] hover:bg-[#282F38] text-[#F4F2ED] border border-[#282F38] font-bold rounded-xl text-xs transition-colors cursor-pointer"
             >
-              Cerrar Detalle
+              Cerrar detalle
             </button>
           </div>
         </div>

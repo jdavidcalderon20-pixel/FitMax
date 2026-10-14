@@ -84,6 +84,7 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
   const [feedbackJoint, setFeedbackJoint] = useState<'ninguna' | 'muscular_normal' | 'molestia_articular'>('ninguna');
   const [lastAdjustment, setLastAdjustment] = useState<AutoregulationAdjustment | null>(null);
   const [inspectedExercise, setInspectedExercise] = useState<ExerciseDetail | null>(null);
+  const [showRoundGuide, setShowRoundGuide] = useState<boolean>(false);
 
   // Cargar estado inicial y persistencia
   useEffect(() => {
@@ -325,8 +326,8 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
             <p className="text-xs text-zinc-300 mt-1 font-semibold">{phaseInfo.subtitle}</p>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-zinc-950 p-1 rounded-xl border border-zinc-800 self-start sm:self-auto">
-            <span className="text-[10px] font-bold text-zinc-500 px-1">Faltan:</span>
+          <div className="flex items-center gap-1.5 bg-[#15181D] p-1 rounded-xl border border-[#282F38] self-start sm:self-auto">
+            <span className="text-[10px] font-bold text-[#A8B0BB] px-1">Faltan:</span>
             {[16, 12, 8, 4, 1].map((w) => (
               <button
                 key={w}
@@ -336,11 +337,11 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
                     localStorage.setItem(`fit_gen_${nickname}_race_weeks_rem`, String(w));
                   } catch (e) {}
                 }}
-                className={`px-2 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  weeksRemaining === w ? 'bg-purple-600 text-white' : 'text-zinc-400 hover:text-white'
+                className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  weeksRemaining === w ? 'bg-[#C084FC] text-[#15181D] font-bold' : 'text-[#A8B0BB] hover:text-[#F4F2ED]'
                 }`}
               >
-                {w} sem
+                {w === 1 ? '1 sem' : `${w} sem`}
               </button>
             ))}
           </div>
@@ -376,16 +377,16 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
       </div>
 
       {/* SELECTOR DE DISCIPLINA */}
-      <div className="grid grid-cols-2 gap-2 mb-4 bg-zinc-100 p-1.5 rounded-2xl">
+      <div className="grid grid-cols-2 gap-2 mb-4 bg-[#20252C] border border-[#282F38] p-1.5 rounded-2xl">
         <button
           onClick={() => { setDiscipline('hyrox'); setActiveDay(0); }}
-          className={`py-2.5 rounded-xl text-sm font-black transition-all cursor-pointer ${discipline === 'hyrox' ? 'bg-zinc-950 text-white shadow' : 'text-zinc-500 hover:text-zinc-800'}`}
+          className={`py-2.5 rounded-xl text-sm font-black transition-all cursor-pointer ${discipline === 'hyrox' ? 'bg-[#C084FC] text-[#15181D] shadow' : 'text-[#A8B0BB] hover:text-[#F4F2ED]'}`}
         >
           Hyrox
         </button>
         <button
           onClick={() => { setDiscipline('ocr'); setActiveDay(0); }}
-          className={`py-2.5 rounded-xl text-sm font-black transition-all cursor-pointer ${discipline === 'ocr' ? 'bg-zinc-950 text-white shadow' : 'text-zinc-500 hover:text-zinc-800'}`}
+          className={`py-2.5 rounded-xl text-sm font-black transition-all cursor-pointer ${discipline === 'ocr' ? 'bg-[#C084FC] text-[#15181D] shadow' : 'text-[#A8B0BB] hover:text-[#F4F2ED]'}`}
         >
           OCR (Obstáculos)
         </button>
@@ -394,7 +395,7 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
       {/* MI OBJETIVO / SUBNIVELES DE DISCIPLINA */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[11px] font-bold text-zinc-500 mr-1">Mi objetivo:</span>
+          <span className="text-[11px] font-bold text-[#A8B0BB] mr-1">Mi objetivo:</span>
           {discipline === 'hyrox'
             ? HYROX_LEVELS.map((l) => (
                 <button
@@ -402,7 +403,7 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
                   onClick={() => setHyroxLevel(l.id)}
                   title={l.description}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                    hyroxLevel === l.id ? 'bg-[#1FD08A] border-[#1FD08A] text-zinc-950 font-black' : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300'
+                    hyroxLevel === l.id ? 'bg-[#C084FC] border-[#C084FC] text-[#15181D] font-black' : 'bg-[#20252C] border-[#282F38] text-[#A8B0BB] hover:border-[#38414D] hover:text-[#F4F2ED]'
                   }`}
                 >
                   {l.name}
@@ -413,8 +414,8 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
                   key={t.id}
                   onClick={() => setOcrLevel(t.id)}
                   title={t.description}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
-                    ocrLevel === t.id ? 'bg-emerald-500 border-emerald-500 text-zinc-950 font-black' : 'bg-white border-zinc-200 text-zinc-600 hover:border-zinc-300'
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                    ocrLevel === t.id ? 'bg-[#C084FC] border-[#C084FC] text-[#15181D] font-black' : 'bg-[#20252C] border-[#282F38] text-[#A8B0BB] hover:border-[#38414D] hover:text-[#F4F2ED]'
                   }`}
                 >
                   {t.name} · {t.distance}
@@ -457,22 +458,22 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] font-bold text-zinc-500 mr-1 hidden sm:inline">Suspensiones:</span>
+          <span className="text-[10px] font-bold text-[#A8B0BB] mr-1 hidden sm:inline">Colgado:</span>
           {[20, 30, 45, 60].map((sec) => (
             <button
               key={sec}
-              onClick={() => startCountdown(sec, `Suspensión / Dead Hang ${sec}s`)}
-              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold px-2.5 py-1.5 rounded-lg text-xs"
+              onClick={() => startCountdown(sec, `Colgado en barra ${sec} s`)}
+              className="bg-[#20252C] hover:bg-[#282F38] text-[#F4F2ED] font-bold px-2.5 py-1.5 rounded-lg text-xs border border-[#282F38] cursor-pointer"
             >
-              {sec}s hang
+              Colgado {sec}s
             </button>
           ))}
-          <span className="text-[10px] font-bold text-zinc-500 mx-1 hidden sm:inline">Descanso:</span>
-          {[60, 90].map((sec) => (
+          <span className="text-[10px] font-bold text-[#A8B0BB] mx-1 hidden sm:inline">Descanso:</span>
+          {[60, 90, 120].map((sec) => (
             <button
               key={sec}
-              onClick={() => startCountdown(sec, `Descanso ${sec}s`)}
-              className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold px-2.5 py-1.5 rounded-lg text-xs"
+              onClick={() => startCountdown(sec, `Descanso +${sec} s`)}
+              className="bg-[#20252C] hover:bg-[#282F38] text-[#1FD08A] font-bold px-2.5 py-1.5 rounded-lg text-xs border border-[#282F38] cursor-pointer"
             >
               +{sec}s
             </button>
@@ -480,7 +481,7 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
           {timerSeconds > 0 && (
             <button
               onClick={() => { setTimerRunning(false); setTimerSeconds(0); }}
-              className="bg-red-950/60 hover:bg-red-900 text-red-300 font-bold px-2.5 py-1.5 rounded-lg text-xs ml-1"
+              className="bg-red-950/60 hover:bg-red-900 text-red-300 font-bold px-2.5 py-1.5 rounded-lg text-xs ml-1 cursor-pointer"
             >
               Parar
             </button>
@@ -494,17 +495,17 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
           <button
             key={i}
             onClick={() => setActiveDay(i)}
-            className={`p-3 rounded-2xl border text-center transition-all ${
+            className={`p-3 rounded-2xl border text-center transition-all cursor-pointer ${
               activeDay === i 
-                ? 'bg-emerald-500/15 border-emerald-500 text-emerald-800 font-black shadow-sm' 
-                : 'bg-zinc-50 border-zinc-200 text-zinc-500 hover:border-zinc-300'
+                ? 'bg-[#C084FC]/20 border-[#C084FC] text-[#C084FC] font-black shadow-sm' 
+                : 'bg-[#20252C] border-[#282F38] text-[#A8B0BB] hover:border-[#38414D]'
             }`}
           >
             <p className="text-[10px] font-black uppercase tracking-wider">Día {i + 1}</p>
             {completed[`${discipline}_${level}_day${i}`] ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-500 mx-auto mt-1" />
+              <CheckCircle2 className="w-4 h-4 text-[#1FD08A] mx-auto mt-1" />
             ) : s.isCompromisedDay ? (
-              <span className="text-[9px] font-black text-purple-700 block mt-1">Metabólico</span>
+              <span className="text-[9px] font-black text-[#C084FC] block mt-1">Metabólico</span>
             ) : null}
           </button>
         ))}
@@ -515,28 +516,38 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
         <div className="flex-1 overflow-y-auto space-y-3">
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-lg font-black text-zinc-900">{session.title}</h3>
+              <h3 className="text-lg font-black text-[#F4F2ED]">{session.title}</h3>
               {session.isCompromisedDay && (
-                <span className="bg-purple-100 text-purple-800 text-[10px] font-black uppercase px-2 py-0.5 rounded-full">
-                  Compromised Running
+                <span className="bg-[#C084FC]/20 text-[#C084FC] text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border border-[#C084FC]/30">
+                  Correr con piernas cansadas
                 </span>
               )}
             </div>
-            <p className="text-xs text-zinc-500 mt-0.5">{session.focus}</p>
+            <p className="text-xs text-[#A8B0BB] mt-0.5">{session.focus}</p>
           </div>
 
-          <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3">
-            <p className="text-[10px] uppercase font-black text-zinc-400 tracking-wider mb-0.5">Calentamiento</p>
-            <p className="text-xs text-zinc-700">{session.warmup}</p>
+          <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3">
+            <p className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider mb-0.5">Calentamiento</p>
+            <p className="text-xs text-zinc-300">{session.warmup}</p>
           </div>
 
-          {/* GUÍA DE FORMATO DE RONDAS */}
-          <div className="bg-amber-50/90 border border-amber-200/90 rounded-2xl p-3 flex items-start gap-2.5">
-            <Info className="w-4 h-4 text-amber-700 mt-0.5 shrink-0" />
-            <div className="text-xs text-amber-900 leading-relaxed">
-              <span className="font-extrabold">¿Cómo funcionan las 3 rondas? </span>
-              Se entrena en <strong>circuito continuo</strong>: haz 1 ronda del Bloque 1 → luego Bloque 2 → Bloque 3... hasta completar toda la lista (= <strong>1 Ronda completada</strong>). Descansas 90-120s y repites desde el Bloque 1 hasta completar el número total de rondas. ¡Toca el nombre de cualquier ejercicio para ver su técnica paso a paso!
-            </div>
+          {/* GUÍA DE FORMATO DE RONDAS (PLEGABLE CON ?) */}
+          <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3">
+            <button
+              onClick={() => setShowRoundGuide(!showRoundGuide)}
+              className="w-full flex items-center justify-between text-left cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <Info className="w-4 h-4 text-[#C084FC]" />
+                <span className="text-xs font-bold text-[#F4F2ED]">¿Cómo funcionan las rondas en circuito?</span>
+              </div>
+              <span className="text-[11px] text-[#A8B0BB] font-semibold">{showRoundGuide ? 'Plegar' : 'Ver ?'}</span>
+            </button>
+            {showRoundGuide && (
+              <p className="text-xs text-[#A8B0BB] mt-2 pt-2 border-t border-[#282F38] leading-relaxed animate-fadeIn">
+                Se entrena en <strong>circuito continuo</strong>: haz 1 ronda del Bloque 1 → luego Bloque 2 → Bloque 3 hasta completar toda la lista (= <strong>1 ronda completada</strong>). Descansas 90-120 s y repites desde el inicio hasta completar el total de rondas. ¡Toca el nombre de cualquier ejercicio para ver su técnica paso a paso!
+              </p>
+            )}
           </div>
 
           {/* CHECKLIST DE BLOQUES CON TARGETS GRANDES */}
