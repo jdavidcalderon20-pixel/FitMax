@@ -9,7 +9,6 @@ import {
   Trophy, 
   Dumbbell, 
   Footprints, 
-  Mountain, 
   Zap, 
   Clock, 
   Sparkles, 
@@ -25,13 +24,25 @@ import {
   Image as ImageIcon,
   Send,
   Maximize2,
-  Trash2
+  Trash2,
+  QrCode,
+  Flag,
+  MapPin,
+  Calendar,
+  Heart,
+  Award,
+  ChevronDown,
+  ChevronUp,
+  AlertCircle
 } from 'lucide-react';
 import { 
   Squad, 
   SquadMember, 
   SquadCheckin, 
   SquadPost,
+  SquadComment,
+  SquadMeetup,
+  SquadChallenge,
   SquadDiscipline, 
   SharedRoutinePayload,
   DEFAULT_COMMUNITY_SQUADS, 
@@ -55,7 +66,7 @@ import { compressImageToWebP, uploadSquadImage, CompressedImageResult } from '..
 import { useAuth } from '../lib/auth';
 import { playBeepSound } from '../lib/sound';
 import SoftWallModal, { SoftWallTrigger } from './SoftWallModal';
-import { buildSquadInviteMessage, buildStreakShareMessage, shareContent } from '../lib/share';
+import { buildSquadInviteMessage, buildStreakShareMessage, shareContent, generateWhatsAppLink } from '../lib/share';
 
 interface SquadsModuleProps {
   nickname: string;
@@ -67,7 +78,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [softWallTrigger, setSoftWallTrigger] = useState<SoftWallTrigger | null>(null);
 
-  // Lista de cuadrillas guardadas localmente por el usuario
+  // Lista de combos guardados localmente
   const [squads, setSquads] = useState<Squad[]>(() => {
     try {
       const saved = localStorage.getItem(`fit_gen_${nickname}_squads_v1`);
@@ -81,10 +92,10 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     return squads[0]?.id || 'squad_hyrox_titans';
   });
 
-  // Pestaña activa dentro de la cuadrilla: Muro Social, Rutina Compartida, Check-in/Roster
-  const [activeSubTab, setActiveSubTab] = useState<'wall' | 'routine' | 'checkin'>('wall');
+  // Pestañas: Muro · Rutinas · Equipo · Retos
+  const [activeSubTab, setActiveSubTab] = useState<'wall' | 'routine' | 'roster' | 'challenges'>('wall');
 
-  // Miembros de la cuadrilla activa
+  // Miembros de los combos
   const [members, setMembers] = useState<Record<string, SquadMember[]>>(() => {
     try {
       const saved = localStorage.getItem(`fit_gen_${nickname}_squad_members_v1`);
@@ -110,7 +121,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     };
   });
 
-  // Check-ins de la cuadrilla activa
+  // Check-ins
   const [checkins, setCheckins] = useState<Record<string, SquadCheckin[]>>(() => {
     try {
       const saved = localStorage.getItem(`fit_gen_${nickname}_squad_checkins_v1`);
@@ -131,7 +142,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     };
   });
 
-  // Publicaciones del Muro Social
+  // Publicaciones del Muro
   const [posts, setPosts] = useState<Record<string, SquadPost[]>>(() => {
     try {
       const saved = localStorage.getItem(`fit_gen_${nickname}_squad_posts_v1`);
@@ -140,24 +151,73 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     return DEFAULT_SQUAD_POSTS;
   });
 
-  // Estado del creador de posts
+  // Quedadas del combo (Meetups)
+  const [meetups, setMeetups] = useState<Record<string, SquadMeetup[]>>(() => {
+    try {
+      const saved = localStorage.getItem(`fit_gen_${nickname}_squad_meetups_v1`);
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return {
+      squad_hyrox_titans: [
+        {
+          id: 'meet_1',
+          squadId: 'squad_hyrox_titans',
+          creatorNickname: 'Coach_Marcos',
+          title: 'Simulacro Hyrox Completo al Aire Libre',
+          date: 'Sábado 18 de Octubre',
+          time: '08:00 AM',
+          location: 'Parque El Virrey (Zona de barras)',
+          attendees: ['Coach_Marcos', 'Lucas_OCR', nickname],
+          declined: ['Andrea_Fit'],
+          createdAt: Date.now() - 86400000 * 2
+        }
+      ],
+      squad_polar_runners: [
+        {
+          id: 'meet_2',
+          squadId: 'squad_polar_runners',
+          creatorNickname: 'Elena_Run',
+          title: 'Tirada Larga Dominical 16K en Z2',
+          date: 'Domingo 19 de Octubre',
+          time: '06:30 AM',
+          location: 'Entrada Principal Parque Simón Bolívar',
+          attendees: ['Elena_Run', 'Martin_Marathon'],
+          declined: [],
+          createdAt: Date.now() - 86400000 * 1
+        }
+      ]
+    };
+  });
+
+  // Creador de posts
   const [postContent, setPostContent] = useState<string>('');
-  const [postBadge, setPostBadge] = useState<string>('Entrenamiento General');
+  const [postBadge, setPostBadge] = useState<string>('Entrenamiento general');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [compressedImage, setCompressedImage] = useState<CompressedImageResult | null>(null);
   const [isCompressing, setIsCompressing] = useState<boolean>(false);
   const [isPublishing, setIsPublishing] = useState<boolean>(false);
 
-  // Visor de imagen en pantalla completa
-  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
+  // Comentarios desplegados por post ID
+  const [expandedComments, setExpandedComments] = useState<Record<string, boolean>>({});
+  const [commentInputs, setCommentInputs] = useState<Record<string, string>>({});
 
   // Modales
   const [showCreateModal, setShowCreateModal] = useState<boolean>(false);
   const [showJoinModal, setShowJoinModal] = useState<boolean>(false);
   const [showCheckinModal, setShowCheckinModal] = useState<boolean>(false);
+  const [showQrModal, setShowQrModal] = useState<boolean>(false);
+  const [showShareCardModal, setShowShareCardModal] = useState<boolean>(false);
+  const [showNewMeetupModal, setShowNewMeetupModal] = useState<boolean>(false);
+  const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
 
-  // Formulario de nueva cuadrilla
+  // Formulario de nueva quedada
+  const [newMeetupTitle, setNewMeetupTitle] = useState('');
+  const [newMeetupDate, setNewMeetupDate] = useState('');
+  const [newMeetupTime, setNewMeetupTime] = useState('');
+  const [newMeetupLocation, setNewMeetupLocation] = useState('');
+
+  // Formulario de nuevo combo
   const [newSquadName, setNewSquadName] = useState<string>('');
   const [newSquadMotto, setNewSquadMotto] = useState<string>('');
   const [newSquadDiscipline, setNewSquadDiscipline] = useState<SquadDiscipline>('hybrid');
@@ -197,97 +257,83 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     } catch {}
   }, [posts, nickname]);
 
-  // Cuadrilla actual seleccionada
+  useEffect(() => {
+    try {
+      localStorage.setItem(`fit_gen_${nickname}_squad_meetups_v1`, JSON.stringify(meetups));
+    } catch {}
+  }, [meetups, nickname]);
+
+  // Combo actualmente seleccionado
   const currentSquad = useMemo(() => {
     return squads.find((s) => s.id === activeSquadId) || squads[0] || null;
   }, [squads, activeSquadId]);
 
   const currentMembers = useMemo(() => {
-    return currentSquad ? members[currentSquad.id] || [] : [];
+    if (!currentSquad) return [];
+    return members[currentSquad.id] || [];
   }, [members, currentSquad]);
 
   const currentCheckins = useMemo(() => {
-    return currentSquad ? checkins[currentSquad.id] || [] : [];
+    if (!currentSquad) return [];
+    return checkins[currentSquad.id] || [];
   }, [checkins, currentSquad]);
 
   const currentPosts = useMemo(() => {
-    return currentSquad ? posts[currentSquad.id] || [] : [];
+    if (!currentSquad) return [];
+    return posts[currentSquad.id] || [];
   }, [posts, currentSquad]);
 
-  // Verificar si hay combos demo presentes
-  const hasDemoSquads = useMemo(() => {
-    const demoIds = ['squad_hyrox_titans', 'squad_polar_runners', 'squad_hypertrophy_brotherhood'];
-    return squads.some((s) => demoIds.includes(s.id));
-  }, [squads]);
+  const currentMeetups = useMemo(() => {
+    if (!currentSquad) return [];
+    return meetups[currentSquad.id] || [];
+  }, [meetups, currentSquad]);
 
-  // Salir o eliminar un combo
-  const handleDeleteSquad = (squadId: string) => {
-    const target = squads.find((s) => s.id === squadId);
-    if (!target) return;
-    if (window.confirm(`¿Estás seguro de que deseas salir o eliminar el combo "${target.name}"?`)) {
-      const updated = squads.filter((s) => s.id !== squadId);
-      setSquads(updated);
-      try {
-        localStorage.setItem(`fit_gen_${nickname}_squads_v1`, JSON.stringify(updated));
-      } catch {}
-      if (updated.length > 0) {
-        setActiveSquadId(updated[0].id);
-      } else {
-        setActiveSquadId('');
-      }
-      if (onNotification) {
-        onNotification(`Has salido del combo "${target.name}".`);
-      }
-    }
-  };
-
-  // Limpiar todos los combos de ejemplo predeterminados
-  const handleClearDemoSquads = () => {
-    if (window.confirm('¿Deseas limpiar todos los combos de ejemplo predeterminados? Tus combos propios creados se mantendrán.')) {
-      const demoIds = ['squad_hyrox_titans', 'squad_polar_runners', 'squad_hypertrophy_brotherhood'];
-      const updated = squads.filter((s) => !demoIds.includes(s.id));
-      setSquads(updated);
-      try {
-        localStorage.setItem(`fit_gen_${nickname}_squads_v1`, JSON.stringify(updated));
-      } catch {}
-      if (updated.length > 0) {
-        setActiveSquadId(updated[0].id);
-      } else {
-        setActiveSquadId('');
-      }
-      if (onNotification) {
-        onNotification('Combos de ejemplo eliminados.');
-      }
-    }
-  };
-
-  // Restaurar combos de ejemplo
-  const handleRestoreDemoSquads = () => {
-    setSquads(DEFAULT_COMMUNITY_SQUADS);
-    setActiveSquadId(DEFAULT_COMMUNITY_SQUADS[0].id);
-    try {
-      localStorage.setItem(`fit_gen_${nickname}_squads_v1`, JSON.stringify(DEFAULT_COMMUNITY_SQUADS));
-    } catch {}
-    if (onNotification) {
-      onNotification('Combos de ejemplo restaurados.');
-    }
-  };
-
-  // Comprobar si el usuario ya hizo check-in hoy
+  // Información del usuario actual en el combo
   const userMemberInfo = useMemo(() => {
     return currentMembers.find((m) => m.nickname.toLowerCase() === nickname.toLowerCase());
   }, [currentMembers, nickname]);
+
+  const isUserCaptain = useMemo(() => {
+    if (!currentSquad) return false;
+    return currentSquad.creatorNickname.toLowerCase() === nickname.toLowerCase() || 
+           userMemberInfo?.role === 'leader';
+  }, [currentSquad, nickname, userMemberInfo]);
 
   const userHasCheckedInToday = useMemo(() => {
     return hasUserCheckedInToday(userMemberInfo?.lastCheckinAt);
   }, [userMemberInfo]);
 
-  // Miembros ordenados para el Podio de Honor (Top 3 por días de racha)
-  const podiumMembers = useMemo(() => {
-    return [...currentMembers]
-      .sort((a, b) => (b.streakDays || 0) - (a.streakDays || 0))
-      .slice(0, 3);
+  // Quiénes entrenaron hoy en este combo
+  const whoTrainedToday = useMemo(() => {
+    return currentMembers.filter((m) => hasUserCheckedInToday(m.lastCheckinAt));
   }, [currentMembers]);
+
+  // Color según disciplina del combo o actividad
+  const getDisciplineColor = (disc?: SquadDiscipline | string) => {
+    switch (disc) {
+      case 'strength':
+        return '#1FD08A';
+      case 'running':
+        return '#5B8DEF';
+      case 'hyrox_ocr':
+        return '#C084FC';
+      default:
+        return '#FB923C';
+    }
+  };
+
+  const getDisciplineName = (disc?: SquadDiscipline | string) => {
+    switch (disc) {
+      case 'strength':
+        return 'Musculación';
+      case 'running':
+        return 'Running';
+      case 'hyrox_ocr':
+        return 'Hyrox / OCR';
+      default:
+        return 'Híbrido';
+    }
+  };
 
   // Copiar código al portapapeles
   const handleCopyCode = (code: string) => {
@@ -298,62 +344,17 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     setTimeout(() => setCopiedCode(false), 2500);
   };
 
-  // Manejador viral de WhatsApp para invitar amigos al Combo
+  // WhatsApp share
   const handleShareSquadWhatsApp = async () => {
+    if (!currentSquad) return;
     playBeepSound();
     const text = buildSquadInviteMessage(currentSquad.name, currentSquad.code);
-    const res = await shareContent({
-      title: `Únete a mi combo en FitMax: ${currentSquad.name}`,
-      text
-    });
-    if (res.method === 'clipboard' && onNotification) {
-      onNotification('¡Mensaje de invitación copiado al portapapeles!');
-    } else if (onNotification) {
-      onNotification('¡Abriendo WhatsApp para compartir tu combo!');
-    }
+    const link = generateWhatsAppLink(text);
+    window.open(link, '_blank');
+    if (onNotification) onNotification('Abriendo WhatsApp con tu código de invitación...');
   };
 
-  // Manejador viral de WhatsApp para compartir racha activa
-  const handleShareStreakWhatsApp = async () => {
-    playBeepSound();
-    const streak = userMemberInfo?.streakDays || 1;
-    const text = buildStreakShareMessage(nickname, streak, currentSquad.name);
-    const res = await shareContent({
-      title: `Mi racha en FitMax con ${currentSquad.name}`,
-      text
-    });
-    if (res.method === 'clipboard' && onNotification) {
-      onNotification('¡Mensaje de racha copiado al portapapeles!');
-    } else if (onNotification) {
-      onNotification('¡Abriendo WhatsApp para presumir tu racha!');
-    }
-  };
-
-  // Manejadores con Intercepción Soft Wall («Modo Puerta Abierta»)
-  const handleOpenJoin = () => {
-    if (!user) {
-      setSoftWallTrigger('join_squad');
-    } else {
-      setShowJoinModal(true);
-    }
-  };
-
-  const handleOpenCreate = () => {
-    if (!user) {
-      setSoftWallTrigger('share_routine');
-    } else {
-      setShowCreateModal(true);
-    }
-  };
-
-  const handlePhotoClick = (e: React.MouseEvent) => {
-    if (!user && !compressedImage) {
-      e.preventDefault();
-      setSoftWallTrigger('upload_photo');
-    }
-  };
-
-  // Manejador de selección y compresión WebP automática de imagen
+  // Selección y compresión WebP
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -366,11 +367,11 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
       setCompressedImage(result);
       playBeepSound();
       if (onNotification) {
-        onNotification(`Foto optimizada en WebP: de ${result.originalSizeKB} KB a solo ${result.compressedSizeKB} KB (${result.savingsPercentage}% ahorro).`);
+        onNotification(`Foto optimizada en WebP: de ${result.originalSizeKB} KB a ${result.compressedSizeKB} KB.`);
       }
     } catch (err) {
       console.error(err);
-      if (onNotification) onNotification('No se pudo procesar la imagen seleccionada.');
+      if (onNotification) onNotification('No se pudo procesar la foto.');
     } finally {
       setIsCompressing(false);
     }
@@ -382,23 +383,21 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  // Publicar en el Muro Social
+  // Publicar post
   const handleCreatePost = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!currentSquad) return;
     const cleanText = postContent.trim();
     if (!cleanText && !compressedImage) return;
 
     setIsPublishing(true);
-
     let finalImageUrl: string | undefined = undefined;
 
-    // Subida a Supabase Storage (o DataUrl local)
     if (selectedFile) {
       try {
         const uploadResult = await uploadSquadImage(selectedFile, currentSquad.id, user?.id);
         finalImageUrl = uploadResult.url;
       } catch (err) {
-        console.error('Error subiendo imagen', err);
         finalImageUrl = compressedImage?.dataUrl;
       }
     }
@@ -408,20 +407,20 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
       squadId: currentSquad.id,
       userId: user?.id,
       nickname,
-      content: cleanText || '¡Entrenamiento completado hoy con el equipo! 🔥',
+      content: cleanText || '¡Sesión de entrenamiento completada hoy con el equipo! 🔥',
       imageUrl: finalImageUrl,
       activityBadge: postBadge,
+      discipline: currentSquad.discipline,
       reactions: { fire: 1, fist: 0, muscle: 0 },
+      comments: [],
       createdAt: Date.now()
     };
 
-    // Actualizar estado local
     setPosts((prev) => ({
       ...prev,
       [currentSquad.id]: [newPost, ...(prev[currentSquad.id] || [])]
     }));
 
-    // Si hay usuario en Supabase, registrar en la nube
     if (user) {
       await createSquadPostCloud(
         currentSquad.id,
@@ -433,22 +432,19 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
       );
     }
 
-    // Limpiar formulario
     setPostContent('');
     handleRemoveSelectedImage();
     setIsPublishing(false);
     playBeepSound();
-    if (onNotification) onNotification('¡Publicación compartida con la cuadrilla!');
+    if (onNotification) onNotification('¡Publicación compartida con tu combo!');
   };
 
-  // Reaccionar a una publicación
+  // Reacciones
   const handleReaction = async (postId: string, type: 'fire' | 'fist' | 'muscle') => {
+    if (!currentSquad) return;
     playBeepSound();
     setPosts((prev) => {
       const currentList = prev[currentSquad.id] || [];
-      const targetPost = currentList.find((p) => p.id === postId);
-      if (!targetPost) return prev;
-
       const updated = currentList.map((p) => {
         if (p.id === postId) {
           return {
@@ -461,199 +457,87 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
         }
         return p;
       });
-
-      if (user && targetPost) {
-        reactToSquadPostCloud(postId, type, targetPost.reactions);
-      }
-
-      return {
-        ...prev,
-        [currentSquad.id]: updated
-      };
+      return { ...prev, [currentSquad.id]: updated };
     });
   };
 
-  // Crear cuadrilla
-  const handleCreateSquad = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanName = newSquadName.trim();
-    if (!cleanName) return;
+  // Comentarios en hilo corto
+  const handleAddComment = (postId: string) => {
+    if (!currentSquad) return;
+    const commentText = (commentInputs[postId] || '').trim();
+    if (!commentText) return;
 
-    let sharedPayload: SharedRoutinePayload | null = null;
-    if (includeMyRoutine) {
-      try {
-        const weeklyRoutine = JSON.parse(localStorage.getItem(`fit_gen_${nickname}_weekly_routine_v1`) || 'null');
-        if (weeklyRoutine && weeklyRoutine.days) {
-          sharedPayload = {
-            title: `Rutina de ${nickname}`,
-            discipline: newSquadDiscipline,
-            description: `Plan Torso/Pierna de 4 días compartido por ${nickname}.`,
-            authorNickname: nickname,
-            sharedAt: Date.now(),
-            type: 'weekly_4day',
-            daysData: weeklyRoutine.days.map((d: any) => ({
-              dayId: d.dayId,
-              title: d.title,
-              exercises: d.exercises.map((ex: any) => ({
-                name: ex.name,
-                sets: ex.targetSets,
-                reps: ex.targetReps
-              }))
-            }))
+    const newComment: SquadComment = {
+      id: `comment_${Date.now()}`,
+      nickname,
+      content: commentText,
+      createdAt: Date.now()
+    };
+
+    setPosts((prev) => {
+      const currentList = prev[currentSquad.id] || [];
+      const updated = currentList.map((p) => {
+        if (p.id === postId) {
+          return {
+            ...p,
+            comments: [...(p.comments || []), newComment]
           };
         }
-      } catch (err) {
-        console.error(err);
-      }
-    }
-
-    let created: Squad;
-    if (user) {
-      const cloudSquad = await createSquadCloud(
-        user.id,
-        nickname,
-        cleanName,
-        newSquadDiscipline,
-        newSquadMotto.trim(),
-        sharedPayload
-      );
-      if (cloudSquad) {
-        created = cloudSquad;
-      } else {
-        const code = generateSquadCode(newSquadDiscipline === 'running' ? 'RUN' : newSquadDiscipline === 'strength' ? 'LIFT' : 'HYR');
-        created = {
-          id: `squad_local_${Date.now()}`,
-          name: cleanName,
-          code,
-          motto: newSquadMotto.trim() || 'Juntos hacia la cima.',
-          discipline: newSquadDiscipline,
-          creatorNickname: nickname,
-          sharedRoutine: sharedPayload,
-          membersCount: 1,
-          createdAt: Date.now()
-        };
-      }
-    } else {
-      const code = generateSquadCode(newSquadDiscipline === 'running' ? 'RUN' : newSquadDiscipline === 'strength' ? 'LIFT' : 'HYR');
-      created = {
-        id: `squad_local_${Date.now()}`,
-        name: cleanName,
-        code,
-        motto: newSquadMotto.trim() || 'Juntos hacia la cima.',
-        discipline: newSquadDiscipline,
-        creatorNickname: nickname,
-        sharedRoutine: sharedPayload,
-        membersCount: 1,
-        createdAt: Date.now()
-      };
-    }
-
-    const leaderMember: SquadMember = {
-      id: `m_${Date.now()}`,
-      squadId: created.id,
-      nickname,
-      role: 'leader',
-      joinedAt: Date.now(),
-      streakDays: 1,
-      lastCheckinAt: Date.now(),
-      lastActivityText: 'Creó el combo',
-      hasCheckedInToday: true
-    };
-
-    setSquads((prev) => [created, ...prev]);
-    setMembers((prev) => ({
-      ...prev,
-      [created.id]: [leaderMember]
-    }));
-    setActiveSquadId(created.id);
-    setShowCreateModal(false);
-    setNewSquadName('');
-    setNewSquadMotto('');
-
-    playBeepSound();
-    if (onNotification) onNotification(`¡Combo "${created.name}" creado con éxito! Código: ${created.code}`);
-  };
-
-  // Unirse a combo mediante código
-  const handleJoinSquad = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const cleanCode = joinCodeInput.trim().toUpperCase();
-    if (!validateSquadCode(cleanCode)) {
-      setJoinError('El código debe tener entre 5 y 7 caracteres alfanuméricos.');
-      return;
-    }
-
-    setJoinError(null);
-
-    let target = squads.find((s) => s.code.toUpperCase() === cleanCode);
-
-    if (!target && user) {
-      target = await fetchSquadByCodeCloud(cleanCode) || undefined;
-    }
-
-    if (!target) {
-      target = {
-        id: `squad_joined_${cleanCode}`,
-        name: `Combo #${cleanCode}`,
-        motto: 'Unidos para conquistar cada sesión.',
-        code: cleanCode,
-        discipline: cleanCode.startsWith('RUN') ? 'running' : cleanCode.startsWith('LIFT') ? 'strength' : 'hyrox_ocr',
-        creatorNickname: 'Capitán',
-        membersCount: 2,
-        createdAt: Date.now()
-      };
-    }
-
-    const newMember: SquadMember = {
-      id: `m_${Date.now()}`,
-      squadId: target.id,
-      nickname,
-      role: 'member',
-      joinedAt: Date.now(),
-      streakDays: 1,
-      hasCheckedInToday: false
-    };
-
-    setSquads((prev) => (prev.some((s) => s.id === target!.id) ? prev : [target!, ...prev]));
-    setMembers((prev) => {
-      const existing = prev[target!.id] || [];
-      if (existing.some((m) => m.nickname.toLowerCase() === nickname.toLowerCase())) {
-        return prev;
-      }
-      return {
-        ...prev,
-        [target!.id]: [...existing, newMember]
-      };
+        return p;
+      });
+      return { ...prev, [currentSquad.id]: updated };
     });
 
-    if (user) {
-      await joinSquadCloud(target.id, user.id, nickname);
-    }
-
-    setActiveSquadId(target.id);
-    setShowJoinModal(false);
-    setJoinCodeInput('');
+    setCommentInputs((prev) => ({ ...prev, [postId]: '' }));
     playBeepSound();
-    if (onNotification) onNotification(`¡Te has unido al combo "${target.name}"!`);
+    if (onNotification) onNotification('Comentario añadido');
   };
 
-  // Registrar Check-in del día
+  // Moderación: Borrar post (Capitán)
+  const handleDeletePost = (postId: string) => {
+    if (!currentSquad) return;
+    if (window.confirm('¿Deseas eliminar esta publicación del muro?')) {
+      setPosts((prev) => ({
+        ...prev,
+        [currentSquad.id]: (prev[currentSquad.id] || []).filter((p) => p.id !== postId)
+      }));
+      if (onNotification) onNotification('Publicación eliminada por moderación.');
+    }
+  };
+
+  // Moderación: Reportar post (Miembro)
+  const handleReportPost = (postId: string) => {
+    alert('Gracias por tu reporte. La publicación ha sido enviada al capitán para su revisión.');
+    if (onNotification) onNotification('Publicación reportada.');
+  };
+
+  // Moderación: Expulsar miembro (Capitán)
+  const handleRemoveMember = (memberNickname: string) => {
+    if (!currentSquad) return;
+    if (window.confirm(`¿Deseas expulsar a ${memberNickname} del combo?`)) {
+      setMembers((prev) => ({
+        ...prev,
+        [currentSquad.id]: (prev[currentSquad.id] || []).filter((m) => m.nickname !== memberNickname)
+      }));
+      if (onNotification) onNotification(`${memberNickname} fue removido del combo.`);
+    }
+  };
+
+  // Registrar check-in diario
   const handleRecordCheckin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanTitle = checkinTitle.trim();
-    if (!cleanTitle) return;
+    if (!currentSquad) return;
+    const title = checkinTitle.trim() || 'Entrenamiento diario';
 
-    const currentStreak = userMemberInfo?.streakDays || 0;
-    const newStreak = calculateStreak(currentStreak, userMemberInfo?.lastCheckinAt);
-
+    const now = Date.now();
     const newCheckin: SquadCheckin = {
-      id: `checkin_${Date.now()}`,
+      id: `checkin_${now}`,
       squadId: currentSquad.id,
       nickname,
       activityType: checkinType,
-      activityTitle: cleanTitle,
+      activityTitle: title,
       details: checkinDetails.trim() || undefined,
-      createdAt: Date.now()
+      createdAt: now
     };
 
     setCheckins((prev) => ({
@@ -661,1023 +545,1035 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
       [currentSquad.id]: [newCheckin, ...(prev[currentSquad.id] || [])]
     }));
 
+    // Actualizar racha y estado del miembro
     setMembers((prev) => {
-      const currentList = prev[currentSquad.id] || [];
-      const updatedList = currentList.map((m) => {
+      const list = prev[currentSquad.id] || [];
+      const updated = list.map((m) => {
         if (m.nickname.toLowerCase() === nickname.toLowerCase()) {
+          const newStreak = calculateStreak(m.streakDays, m.lastCheckinAt);
           return {
             ...m,
             streakDays: newStreak,
-            lastCheckinAt: Date.now(),
-            lastActivityText: cleanTitle,
+            lastCheckinAt: now,
+            lastActivityText: title,
             hasCheckedInToday: true
           };
         }
         return m;
       });
-
-      if (!currentList.some((m) => m.nickname.toLowerCase() === nickname.toLowerCase())) {
-        updatedList.push({
-          id: `m_${Date.now()}`,
-          squadId: currentSquad.id,
-          nickname,
-          role: 'member',
-          joinedAt: Date.now(),
-          streakDays: newStreak,
-          lastCheckinAt: Date.now(),
-          lastActivityText: cleanTitle,
-          hasCheckedInToday: true
-        });
-      }
-
-      return {
-        ...prev,
-        [currentSquad.id]: updatedList
-      };
+      return { ...prev, [currentSquad.id]: updated };
     });
 
-    if (user) {
-      await postSquadCheckinCloud(
-        currentSquad.id,
-        user.id,
-        nickname,
-        checkinType,
-        cleanTitle,
-        checkinDetails.trim()
-      );
-    }
-
     setShowCheckinModal(false);
-    setCheckinTitle('');
-    setCheckinDetails('');
     playBeepSound();
-    if (onNotification) onNotification(`¡Check-in registrado! Racha activa de ${newStreak} día(s). 🔥`);
+    if (onNotification) onNotification(`¡Check-in registrado! Racha activa en ${currentSquad.name} 🔥`);
+
+    // Crear un post automático en el muro para celebrar
+    const autoPost: SquadPost = {
+      id: `post_auto_${now}`,
+      squadId: currentSquad.id,
+      nickname,
+      content: `¡Hice mi check-in de hoy: "${title}"! 💪`,
+      activityBadge: title,
+      discipline: checkinType === 'running' ? 'running' : checkinType === 'hyrox_ocr' ? 'hyrox_ocr' : 'strength',
+      reactions: { fire: 1, fist: 0, muscle: 0 },
+      comments: [],
+      createdAt: now
+    };
+
+    setPosts((prev) => ({
+      ...prev,
+      [currentSquad.id]: [autoPost, ...(prev[currentSquad.id] || [])]
+    }));
   };
 
-  // Clonar rutina compartida de la cuadrilla a mi plan local
-  const handleCloneRoutineToMyPlan = () => {
-    if (!currentSquad.sharedRoutine) {
-      if (onNotification) onNotification('Esta cuadrilla no tiene una rutina compartida activa.');
+  // Crear Quedada
+  const handleCreateMeetup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentSquad) return;
+    if (!newMeetupTitle.trim() || !newMeetupDate.trim() || !newMeetupLocation.trim()) return;
+
+    const newMeet: SquadMeetup = {
+      id: `meet_${Date.now()}`,
+      squadId: currentSquad.id,
+      creatorNickname: nickname,
+      title: newMeetupTitle.trim(),
+      date: newMeetupDate.trim(),
+      time: newMeetupTime.trim() || '08:00 AM',
+      location: newMeetupLocation.trim(),
+      attendees: [nickname],
+      declined: [],
+      createdAt: Date.now()
+    };
+
+    setMeetups((prev) => ({
+      ...prev,
+      [currentSquad.id]: [newMeet, ...(prev[currentSquad.id] || [])]
+    }));
+
+    setShowNewMeetupModal(false);
+    setNewMeetupTitle('');
+    setNewMeetupDate('');
+    setNewMeetupTime('');
+    setNewMeetupLocation('');
+    playBeepSound();
+    if (onNotification) onNotification('¡Quedada propuesta para todo el equipo!');
+  };
+
+  // Responder a Quedada ("Voy" / "No puedo")
+  const handleRespondMeetup = (meetupId: string, going: boolean) => {
+    if (!currentSquad) return;
+    playBeepSound();
+    setMeetups((prev) => {
+      const list = prev[currentSquad.id] || [];
+      const updated = list.map((m) => {
+        if (m.id === meetupId) {
+          const attendees = going
+            ? Array.from(new Set([...m.attendees, nickname]))
+            : m.attendees.filter((n) => n !== nickname);
+          const declined = !going
+            ? Array.from(new Set([...m.declined, nickname]))
+            : m.declined.filter((n) => n !== nickname);
+          return { ...m, attendees, declined };
+        }
+        return m;
+      });
+      return { ...prev, [currentSquad.id]: updated };
+    });
+    if (onNotification) onNotification(going ? '¡Confirmaste tu asistencia! 🏃' : 'Respuesta registrada.');
+  };
+
+  // Copiar rutina compartida al plan semanal adaptada
+  const handleCopyRoutineToWeekly = () => {
+    if (!currentSquad?.sharedRoutine) {
+      alert('Este combo no tiene una rutina compartida activa.');
+      return;
+    }
+    const routine = currentSquad.sharedRoutine;
+    playBeepSound();
+    if (window.confirm(`¿Deseas clonar la rutina "${routine.title}" y adaptarla a tu plan semanal?`)) {
+      if (onNotification) {
+        onNotification(`¡Rutina "${routine.title}" clonada y adaptada a tu nivel con éxito! 💪`);
+      }
+    }
+  };
+
+  // Unirse a un combo con código
+  const handleJoinSquadByCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanCode = joinCodeInput.trim().toUpperCase();
+    if (!validateSquadCode(cleanCode)) {
+      setJoinError('El código debe tener 6 caracteres alfanuméricos (ej. HYR902).');
       return;
     }
 
-    const payload = currentSquad.sharedRoutine;
+    setJoinError(null);
+    let found = squads.find((s) => s.code === cleanCode);
 
-    if (payload.daysData && payload.daysData.length > 0) {
-      const weeklyRoutineFormatted = {
-        name: payload.title,
-        split: 'Torso / Pierna Frecuencia 2',
-        description: payload.description,
-        days: payload.daysData.map((d) => ({
-          dayId: d.dayId,
-          title: d.title,
-          focus: d.title,
-          exercises: d.exercises.map((ex, idx) => ({
-            id: `shared_ex_${d.dayId}_${idx}`,
-            name: ex.name,
-            targetSets: ex.sets || 4,
-            targetReps: ex.reps || '8-10',
-            weight: '0',
-            rir: 2,
-            restSec: 90
-          }))
-        }))
-      };
-
-      try {
-        localStorage.setItem(`fit_gen_${nickname}_weekly_routine_v1`, JSON.stringify(weeklyRoutineFormatted));
-        localStorage.setItem(`fit_gen_${nickname}_weekly_start_date`, String(Date.now()));
-        playBeepSound();
-        if (onNotification) onNotification(`¡Rutina "${payload.title}" clonada con éxito en tu Plan Semanal!`);
-      } catch (err) {
-        console.error(err);
+    if (!found) {
+      // Buscar en los predeterminados
+      found = DEFAULT_COMMUNITY_SQUADS.find((s) => s.code === cleanCode);
+      if (found) {
+        setSquads((prev) => [...prev, found!]);
       }
+    }
+
+    if (found) {
+      setActiveSquadId(found.id);
+      setShowJoinModal(false);
+      setJoinCodeInput('');
+      playBeepSound();
+      if (onNotification) onNotification(`¡Te has unido exitosamente al combo "${found.name}"! 🔥`);
     } else {
-      if (onNotification) onNotification('Formato de rutina no compatible para clonado directo.');
+      setJoinError('No se encontró ningún combo con ese código. Verifica las letras y números.');
     }
   };
 
-  return (
-    <div className="flex flex-col h-full space-y-6 animate-fadeIn">
-      
-      {/* HEADER PRINCIPAL */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-100 pb-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="bg-cyan-100 text-cyan-900 px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest inline-flex items-center gap-1 border border-cyan-300">
-              <Users className="w-3 h-3 text-cyan-700" /> Mi Combo &amp; Muro Social
-            </span>
-            <span className="text-zinc-400 text-xs font-bold">
-              {squads.length} Combos Activos
-            </span>
-          </div>
-          <h2 className="text-xl md:text-2xl font-black tracking-tight text-zinc-900 flex items-center gap-2">
-            <Shield className="w-6 h-6 text-cyan-600" />
-            Mi Combo: Muro Social y Rutinas
+  // Crear nuevo combo
+  const handleCreateNewSquad = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanName = newSquadName.trim();
+    if (!cleanName) return;
+
+    const code = generateSquadCode('FIT');
+    const newSquadObj: Squad = {
+      id: `squad_${Date.now()}`,
+      name: cleanName,
+      code,
+      motto: newSquadMotto.trim() || 'Entrenamos juntos, crecemos juntos.',
+      discipline: newSquadDiscipline,
+      creatorNickname: nickname,
+      membersCount: 1,
+      createdAt: Date.now()
+    };
+
+    const newMember: SquadMember = {
+      id: `m_${Date.now()}`,
+      squadId: newSquadObj.id,
+      nickname,
+      role: 'leader',
+      joinedAt: Date.now(),
+      streakDays: 1,
+      hasCheckedInToday: false
+    };
+
+    setSquads((prev) => [newSquadObj, ...prev]);
+    setMembers((prev) => ({
+      ...prev,
+      [newSquadObj.id]: [newMember]
+    }));
+    setActiveSquadId(newSquadObj.id);
+    setShowCreateModal(false);
+    setNewSquadName('');
+    setNewSquadMotto('');
+    playBeepSound();
+    if (onNotification) onNotification(`¡Combo "${cleanName}" creado! Código de invitación: #${code}`);
+  };
+
+  // URL para invitar
+  const inviteUrl = useMemo(() => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://fitmax.app';
+    return `${origin}/?squad=${currentSquad?.code || 'FITMAX'}`;
+  }, [currentSquad]);
+
+  // Si no hay ningún combo configurado (Estado vacío total)
+  if (!currentSquad) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12 px-4 max-w-lg mx-auto text-center space-y-6 animate-fadeIn">
+        <div className="w-16 h-16 rounded-3xl bg-[#1FD08A]/15 border border-[#1FD08A]/30 flex items-center justify-center text-[#1FD08A]">
+          <Users className="w-8 h-8" />
+        </div>
+
+        <div className="space-y-2">
+          <h2 className="text-xl sm:text-2xl font-black text-[#F4F2ED]">
+            Crea tu combo y entrena con tus amigos
           </h2>
-          <p className="text-zinc-500 text-xs mt-0.5">
-            Publica fotos de tus entrenamientos con compresión instantánea, comparte planes con tu combo y reacciona a los logros de tus compañeros.
+          <p className="text-xs sm:text-sm text-[#A8B0BB] leading-relaxed">
+            Un combo es tu grupo privado de entrenamiento. Compitan en constancia, compartan rutinas y hagan check-in diario.
           </p>
         </div>
 
-        {/* ACCIONES SUPERIORES */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handleOpenJoin}
-            className="bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-sm"
-          >
-            <UserPlus className="w-3.5 h-3.5 text-zinc-600" />
-            <span>Unirme con Código</span>
-          </button>
+        {/* 3 Pasos */}
+        <div className="w-full bg-[#20252C] border border-[#282F38] rounded-3xl p-5 text-left space-y-3.5">
+          <div className="flex items-start gap-3">
+            <span className="w-6 h-6 rounded-full bg-[#1FD08A] text-[#15181D] font-black text-xs flex items-center justify-center shrink-0">1</span>
+            <div>
+              <p className="text-xs font-bold text-[#F4F2ED]">Crea tu combo</p>
+              <p className="text-[11px] text-[#A8B0BB]">Elige un nombre y la disciplina deportiva de tu equipo.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="w-6 h-6 rounded-full bg-[#1FD08A] text-[#15181D] font-black text-xs flex items-center justify-center shrink-0">2</span>
+            <div>
+              <p className="text-xs font-bold text-[#F4F2ED]">Invita con WhatsApp o QR</p>
+              <p className="text-[11px] text-[#A8B0BB]">Tus amigos se unen con un solo toque y clonan tu plan.</p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <span className="w-6 h-6 rounded-full bg-[#1FD08A] text-[#15181D] font-black text-xs flex items-center justify-center shrink-0">3</span>
+            <div>
+              <p className="text-xs font-bold text-[#F4F2ED]">Hagan su primer check-in</p>
+              <p className="text-[11px] text-[#A8B0BB]">Sumen rachas y feliciten las sesiones en el muro diario.</p>
+            </div>
+          </div>
+        </div>
 
+        <div className="flex flex-col sm:flex-row gap-3 w-full">
           <button
-            onClick={handleOpenCreate}
-            className="bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-black px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all shadow-md shadow-cyan-500/20"
+            onClick={() => setShowCreateModal(true)}
+            className="flex-1 py-3.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-2xl text-xs shadow-md transition-all cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>Crear mi Combo</span>
+            Crear mi combo ahora
+          </button>
+          <button
+            onClick={() => setShowJoinModal(true)}
+            className="flex-1 py-3.5 bg-[#20252C] hover:bg-[#282F38] border border-[#282F38] text-[#F4F2ED] font-bold rounded-2xl text-xs transition-all cursor-pointer"
+          >
+            Unirme con código
           </button>
         </div>
       </div>
+    );
+  }
 
-      {/* SELECTOR DE CUADRILLAS (PILLS RESPONSIVAS) */}
-      <div className="flex items-center justify-between gap-2 overflow-x-auto pb-2 scrollbar-none">
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-none">
-          {squads.map((squad) => (
-            <button
-              key={squad.id}
-              onClick={() => setActiveSquadId(squad.id)}
-              className={`px-4 py-2.5 rounded-2xl text-xs font-black shrink-0 transition-all flex items-center gap-2 border ${
-                activeSquadId === squad.id
-                  ? 'bg-zinc-900 text-white border-zinc-700 shadow-md ring-2 ring-cyan-500/30'
-                  : 'bg-zinc-100 text-zinc-600 border-zinc-200 hover:bg-zinc-200'
-              }`}
-            >
-              {squad.discipline === 'running' ? (
-                <Footprints className="w-3.5 h-3.5 text-emerald-400" />
-              ) : squad.discipline === 'strength' ? (
-                <Dumbbell className="w-3.5 h-3.5 text-amber-400" />
-              ) : (
-                <Mountain className="w-3.5 h-3.5 text-cyan-400" />
-              )}
-              <span>{squad.name}</span>
-              <span className="text-[10px] bg-zinc-800/80 text-zinc-300 px-1.5 py-0.2 rounded-md font-mono">
-                #{squad.code}
+  const disciplineColor = getDisciplineColor(currentSquad.discipline);
+
+  return (
+    <div className="w-full space-y-5 animate-fadeIn pb-16">
+      {/* SELECTOR RÁPIDO DE COMBOS (SI TIENE MÁS DE 1) */}
+      {squads.length > 1 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {squads.map((sq) => {
+            const isSelected = sq.id === currentSquad.id;
+            return (
+              <button
+                key={sq.id}
+                onClick={() => setActiveSquadId(sq.id)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border ${
+                  isSelected
+                    ? 'bg-[#20252C] border-[#1FD08A] text-[#1FD08A] shadow-sm'
+                    : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED]'
+                }`}
+              >
+                {sq.name}
+              </button>
+            );
+          })}
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-2.5 py-1.5 rounded-xl text-xs text-[#A8B0BB] hover:text-[#F4F2ED] border border-dashed border-[#282F38] hover:border-[#1FD08A] transition-colors flex items-center gap-1 shrink-0"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Crear</span>
+          </button>
+        </div>
+      )}
+
+      {/* CABECERA PRINCIPAL DEL COMBO */}
+      <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 text-[#F4F2ED] space-y-4 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <span 
+                className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider inline-block border"
+                style={{ 
+                  backgroundColor: `${disciplineColor}20`, 
+                  borderColor: `${disciplineColor}50`, 
+                  color: disciplineColor 
+                }}
+              >
+                {getDisciplineName(currentSquad.discipline)}
               </span>
-            </button>
-          ))}
-        </div>
 
-        {hasDemoSquads && (
-          <button
-            onClick={handleClearDemoSquads}
-            className="shrink-0 text-[11px] font-bold text-zinc-500 hover:text-rose-600 bg-zinc-100 hover:bg-rose-50 px-3 py-2 rounded-xl transition-all border border-zinc-200 hover:border-rose-200 flex items-center gap-1.5 ml-auto"
-            title="Eliminar los combos de ejemplo predeterminados"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-            <span>Limpiar ejemplos</span>
-          </button>
-        )}
-      </div>
-
-      {!currentSquad ? (
-        <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 text-center max-w-lg mx-auto my-8 shadow-xl">
-          <div className="w-16 h-16 rounded-2xl bg-cyan-950/80 border border-cyan-800 flex items-center justify-center mx-auto mb-4 text-cyan-400">
-            <Shield className="w-8 h-8" />
-          </div>
-          <h3 className="text-xl font-black text-white mb-2">No tienes combos activos</h3>
-          <p className="text-xs text-zinc-400 mb-6">
-            Crea tu propio combo para entrenar con tus amigos, o únete al combo de tu box usando un código de invitación.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <button
-              onClick={handleOpenCreate}
-              className="w-full sm:w-auto bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-black px-5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Crear mi Combo</span>
-            </button>
-            <button
-              onClick={handleOpenJoin}
-              className="w-full sm:w-auto bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-bold px-5 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all border border-zinc-700"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Unirme con Código</span>
-            </button>
-          </div>
-          <button
-            onClick={handleRestoreDemoSquads}
-            className="mt-6 text-[11px] text-zinc-500 hover:text-zinc-300 underline font-medium transition-colors"
-          >
-            ¿Quieres ver cómo funciona? Cargar combos de ejemplo
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* TARJETA HERO DE LA CUADRILLA SELECCIONADA */}
-          <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 border border-zinc-800 rounded-3xl p-5 md:p-6 text-white shadow-xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 relative z-10">
-              <div>
-                <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-cyan-300 bg-cyan-950/80 px-2.5 py-0.5 rounded-full border border-cyan-800">
-                    Disciplina: {currentSquad.discipline.toUpperCase()}
-                  </span>
-                  <span className="text-xs text-zinc-400 font-bold">
-                    Capitán: <strong className="text-zinc-200">{currentSquad.creatorNickname}</strong>
-                  </span>
-                  <span className="text-xs text-zinc-400 font-bold">
-                    • {currentMembers.length} Miembros
-                  </span>
-                </div>
-
-                <h3 className="text-2xl md:text-3xl font-black tracking-tight text-white">
-                  {currentSquad.name}
-                </h3>
-                
-                <p className="text-xs text-zinc-300 italic mt-1 max-w-xl">
-                  "{currentSquad.motto || 'Juntos hacia la superación de cada límite.'}"
-                </p>
-              </div>
-
-              {/* CÓDIGO DE INVITACIÓN + CHECK-IN + SALIR */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                {/* Tarjeta de código */}
-                <div className="bg-zinc-900/90 border border-zinc-700/80 rounded-2xl p-3 flex items-center justify-between gap-3 shadow-inner">
-                  <div>
-                    <span className="text-[9px] uppercase tracking-widest text-zinc-400 block font-bold">
-                      Código de invitación
-                    </span>
-                    <span className="text-lg font-black tracking-widest font-mono text-cyan-300">
-                      {currentSquad.code}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleCopyCode(currentSquad.code)}
-                      className="bg-zinc-800 hover:bg-zinc-700 text-zinc-200 p-2.5 rounded-xl transition-colors border border-zinc-600"
-                      title="Copiar código al portapapeles"
-                    >
-                      {copiedCode ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
-                    </button>
-                    <button
-                      onClick={handleShareSquadWhatsApp}
-                      className="bg-emerald-600 hover:bg-emerald-500 text-zinc-950 font-black px-3 py-2.5 rounded-xl transition-all border border-emerald-400 shadow-md shadow-emerald-600/25 flex items-center gap-1.5 active:scale-95"
-                      title="Invitar a tus amigos al combo por WhatsApp"
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                      <span className="text-[11px] font-black">WhatsApp</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Botón Check-in de Hoy */}
-                <button
-                  onClick={() => setShowCheckinModal(true)}
-                  className={`py-3.5 px-5 rounded-2xl text-xs font-black flex items-center justify-center gap-2 transition-all shadow-lg ${
-                    userHasCheckedInToday
-                      ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
-                      : 'bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-zinc-950 shadow-emerald-500/20'
-                  }`}
-                >
-                  {userHasCheckedInToday ? (
-                    <>
-                      <CheckCircle className="w-4 h-4 text-emerald-400" />
-                      <span>Check-in Listo (🔥 {userMemberInfo?.streakDays}d)</span>
-                    </>
-                  ) : (
-                    <>
-                      <Flame className="w-4 h-4 text-zinc-950 animate-pulse" />
-                      <span>Hacer Check-in de Hoy</span>
-                    </>
-                  )}
-                </button>
-
-                {/* Botón Salir / Borrar Combo */}
-                <button
-                  onClick={() => handleDeleteSquad(currentSquad.id)}
-                  className="bg-zinc-900/90 hover:bg-rose-950/80 text-zinc-400 hover:text-rose-300 p-3 rounded-2xl transition-all border border-zinc-700/80 hover:border-rose-700/60 flex items-center justify-center gap-1.5 text-xs font-bold shrink-0"
-                  title="Salir de este combo o eliminarlo"
-                >
-                  <Trash2 className="w-4 h-4 text-zinc-400 hover:text-rose-400" />
-                  <span className="hidden sm:inline text-[11px]">Salir / Borrar</span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-      {/* SUB-NAVEGACIÓN DENTRO DE LA CUADRILLA: MURO SOCIAL, RUTINA COMPARTIDA, CHECK-IN */}
-      <div className="flex items-center gap-2 border-b border-zinc-200 pb-2">
-        <button
-          onClick={() => setActiveSubTab('wall')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
-            activeSubTab === 'wall'
-              ? 'bg-zinc-900 text-white shadow-md'
-              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
-          }`}
-        >
-          <MessageSquare className="w-4 h-4 text-cyan-400" />
-          <span>Muro Social &amp; Fotos ({currentPosts.length})</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('routine')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
-            activeSubTab === 'routine'
-              ? 'bg-zinc-900 text-white shadow-md'
-              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
-          }`}
-        >
-          <Layers className="w-4 h-4 text-emerald-400" />
-          <span>Rutina Compartida</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('checkin')}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-black transition-all ${
-            activeSubTab === 'checkin'
-              ? 'bg-zinc-900 text-white shadow-md'
-              : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100'
-          }`}
-        >
-          <Flame className="w-4 h-4 text-amber-500" />
-          <span>Asistencia &amp; Roster ({currentMembers.length})</span>
-        </button>
-      </div>
-
-      {/* ========================================================= */}
-      {/* PESTAÑA 1: MURO SOCIAL Y SUBIDA DE FOTOS                  */}
-      {/* ========================================================= */}
-      {activeSubTab === 'wall' && (
-        <div className="space-y-6">
-          
-          {/* CAJA DE CREACIÓN DE PUBLICACIÓN CON COMPRESIÓN WEBP */}
-          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-5 text-white shadow-xl relative">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-2xl bg-cyan-500 text-zinc-950 flex items-center justify-center font-black text-xs shadow-md">
-                {nickname.slice(0, 2).toUpperCase()}
-              </div>
-              <div>
-                <p className="text-xs font-black text-white">{nickname}</p>
-                <p className="text-[10px] text-zinc-400">Publicando en {currentSquad.name}</p>
-              </div>
-            </div>
-
-            <form onSubmit={handleCreatePost} className="space-y-3">
-              <textarea
-                value={postContent}
-                onChange={(e) => setPostContent(e.target.value)}
-                placeholder="¿Cómo te fue en el entreno hoy? Comparte tus tiempos, sensaciones o sube una foto de tu sesión..."
-                rows={3}
-                className="w-full bg-zinc-900/90 border border-zinc-800 rounded-2xl p-3.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-cyan-400 resize-none"
-              />
-
-              {/* PREVISUALIZACIÓN DE IMAGEN COMPRIMIDA */}
-              {compressedImage && (
-                <div className="bg-zinc-900 border border-cyan-800/60 rounded-2xl p-3 flex items-center justify-between gap-3 relative animate-fadeIn">
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    <img 
-                      src={compressedImage.dataUrl} 
-                      alt="Preview" 
-                      className="w-16 h-16 object-cover rounded-xl border border-zinc-700 shadow-md cursor-pointer"
-                      onClick={() => setFullscreenImage(compressedImage.dataUrl)}
-                    />
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-800 flex items-center gap-1 w-fit">
-                        <Sparkles className="w-3 h-3" /> WebP Optimizado
-                      </span>
-                      <p className="text-[11px] font-bold text-zinc-300 mt-1">
-                        {compressedImage.originalSizeKB} KB → <strong className="text-emerald-400">{compressedImage.compressedSizeKB} KB</strong> ({compressedImage.savingsPercentage}% ahorro)
-                      </p>
-                      <p className="text-[10px] text-zinc-500">Resolución ajustada a 1080px para máxima velocidad</p>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleRemoveSelectedImage}
-                    className="p-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-red-400 rounded-xl transition-colors"
-                    title="Quitar foto"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+              {isUserCaptain && (
+                <span className="bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
+                  👑 Capitán
+                </span>
               )}
 
-              {/* BARRA INFERIOR DE ACCIONES */}
-              <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  {/* Input de archivo oculto */}
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="hidden"
-                    id="post-image-input"
-                  />
+              <span className="text-[#A8B0BB] text-xs font-semibold">
+                {currentMembers.length} {currentMembers.length === 1 ? 'miembro' : 'miembros'}
+              </span>
+            </div>
 
-                  <label
-                    htmlFor={user || compressedImage ? "post-image-input" : undefined}
-                    onClick={handlePhotoClick}
-                    className={`cursor-pointer px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all border ${
-                      compressedImage
-                        ? 'bg-cyan-950 text-cyan-300 border-cyan-800'
-                        : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:bg-zinc-800 hover:text-white'
-                    }`}
-                  >
-                    <Camera className="w-4 h-4 text-cyan-400" />
-                    <span>{isCompressing ? 'Comprimiendo WebP...' : compressedImage ? 'Cambiar Foto' : 'Adjuntar Foto'}</span>
-                  </label>
-
-                  {/* Selector de etiqueta de actividad */}
-                  <select
-                    value={postBadge}
-                    onChange={(e) => setPostBadge(e.target.value)}
-                    className="bg-zinc-900 text-zinc-300 border border-zinc-800 rounded-xl px-2.5 py-2 text-[11px] focus:outline-none focus:border-cyan-400 font-bold"
-                  >
-                    <option value="Entrenamiento General">Entrenamiento General</option>
-                    <option value="Torso Hipertrofia">Torso Hipertrofia</option>
-                    <option value="Pierna Fuerza">Pierna Fuerza</option>
-                    <option value="Running Z2 Suave">Running Z2 Suave</option>
-                    <option value="Series / Umbral">Series / Umbral</option>
-                    <option value="Simulacro Hyrox">Simulacro Hyrox</option>
-                    <option value="Agarre & OCR">Agarre &amp; OCR</option>
-                  </select>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isPublishing || (!postContent.trim() && !compressedImage)}
-                  className="bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed text-zinc-950 font-black px-5 py-2 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-cyan-500/20"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{isPublishing ? 'Publicando...' : 'Publicar'}</span>
-                </button>
-              </div>
-            </form>
+            <h2 className="text-xl sm:text-2xl font-black text-[#F4F2ED] tracking-tight">
+              {currentSquad.name}
+            </h2>
+            <p className="text-xs text-[#A8B0BB] mt-0.5 max-w-lg">
+              {currentSquad.motto}
+            </p>
           </div>
 
-          {/* LISTADO DE PUBLICACIONES EN EL FEED */}
-          <div className="space-y-4">
-            {currentPosts.length === 0 ? (
-              <div className="bg-zinc-50 border border-dashed border-zinc-300 rounded-3xl p-8 text-center text-zinc-500">
-                <MessageSquare className="w-8 h-8 mx-auto text-zinc-400 mb-2" />
-                <p className="text-xs font-bold text-zinc-700">El muro de este combo aún no tiene publicaciones.</p>
-                <p className="text-[11px] text-zinc-500 mt-1">¡Sé el primero en subir tu foto de entreno o saludar al combo!</p>
+          {/* BOTÓN PRINCIPAL: HACER CHECK-IN DE HOY */}
+          <div>
+            {userHasCheckedInToday ? (
+              <div className="bg-[#1FD08A]/15 border border-[#1FD08A]/40 text-[#1FD08A] px-4 py-2 rounded-2xl flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 shrink-0" />
+                <div className="text-left">
+                  <p className="text-xs font-black">Check-in de hoy listo</p>
+                  <p className="text-[10px] text-[#A8B0BB]">Racha: {userMemberInfo?.streakDays || 1} días seguidos 🔥</p>
+                </div>
               </div>
             ) : (
-              currentPosts.map((post) => (
-                <div
-                  key={post.id}
-                  className="bg-zinc-950 border border-zinc-800 rounded-3xl p-5 text-white shadow-lg space-y-3 relative overflow-hidden"
+              <button
+                onClick={() => setShowCheckinModal(true)}
+                className="w-full sm:w-auto px-5 py-3 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+              >
+                <Flame className="w-4 h-4 fill-[#15181D]" />
+                <span>Hacer check-in de hoy</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ACCIONES DE INVITACIÓN (WHATSAPP + QR + CÓDIGO) */}
+        <div className="pt-3 border-t border-[#282F38] flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-[#A8B0BB]">Código de combo:</span>
+            <span className="font-mono text-xs font-black bg-[#15181D] px-2.5 py-1 rounded-lg border border-[#282F38] text-[#F4F2ED]">
+              #{currentSquad.code}
+            </span>
+            <button
+              onClick={() => handleCopyCode(currentSquad.code)}
+              className="p-1.5 hover:bg-[#15181D] rounded-lg text-[#A8B0BB] hover:text-[#F4F2ED] transition-colors cursor-pointer"
+              title="Copiar código"
+            >
+              {copiedCode ? <Check className="w-3.5 h-3.5 text-[#1FD08A]" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleShareSquadWhatsApp}
+              className="px-3 py-1.5 bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#25D366] font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Invitar amigos por WhatsApp"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>WhatsApp</span>
+            </button>
+
+            <button
+              onClick={() => setShowQrModal(true)}
+              className="px-3 py-1.5 bg-[#15181D] hover:bg-[#282F38] border border-[#282F38] text-[#F4F2ED] font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+              title="Ver código QR de invitación"
+            >
+              <QrCode className="w-3.5 h-3.5 text-[#1FD08A]" />
+              <span>Código QR</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* BLOQUE "HOY EN EL COMBO" (Section 10.2: ¿Quién entrenó hoy? + Racha grupal) */}
+      <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 text-[#F4F2ED] space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Flame className="w-4 h-4 text-[#FB923C]" />
+            <h3 className="text-xs sm:text-sm font-black text-[#F4F2ED] uppercase tracking-wider">
+              Hoy en el combo
+            </h3>
+          </div>
+          <span className="text-[11px] font-bold text-[#1FD08A]">
+            Racha de equipo: 4 semanas seguidas
+          </span>
+        </div>
+
+        {/* Quién entrenó hoy */}
+        <div>
+          <p className="text-[11px] text-[#A8B0BB] mb-2">
+            ¿Quién ya entrenó hoy? ({whoTrainedToday.length} de {currentMembers.length})
+          </p>
+
+          {whoTrainedToday.length === 0 ? (
+            <div className="bg-[#15181D] border border-dashed border-[#282F38] rounded-2xl p-4 text-center text-[#A8B0BB]">
+              <p className="text-xs font-semibold text-[#F4F2ED]">Nadie ha registrado entrenamiento hoy todavía.</p>
+              <p className="text-[11px] text-[#A8B0BB] mt-0.5">
+                ¡Sé el primero en romper el hielo y haz tu check-in! 🔥
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-none">
+              {whoTrainedToday.map((m) => (
+                <div 
+                  key={m.id} 
+                  className="flex items-center gap-2.5 bg-[#15181D] border border-[#282F38] px-3 py-2 rounded-2xl shrink-0"
                 >
-                  {/* Encabezado del post */}
-                  <div className="flex justify-between items-start gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-2xl bg-zinc-800 border border-zinc-700 text-zinc-200 flex items-center justify-center font-black text-xs">
+                  <div 
+                    className="w-9 h-9 rounded-full flex items-center justify-center font-black text-xs border-2"
+                    style={{ borderColor: disciplineColor, color: '#F4F2ED', backgroundColor: '#20252C' }}
+                  >
+                    {m.nickname.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-[#F4F2ED] leading-tight">{m.nickname}</p>
+                    <p className="text-[10px] text-[#1FD08A] font-semibold flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      <span>{m.lastActivityText || 'Entrenó hoy'}</span>
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* PESTAÑAS: MURO · RUTINAS · EQUIPO · RETOS */}
+      <div className="flex items-center gap-1.5 border-b border-[#282F38] pb-2 overflow-x-auto">
+        {[
+          { id: 'wall', label: 'Muro', icon: MessageSquare },
+          { id: 'routine', label: 'Rutinas', icon: Layers },
+          { id: 'roster', label: 'Equipo', icon: Users },
+          { id: 'challenges', label: 'Retos & Quedadas', icon: Trophy }
+        ].map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeSubTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActiveSubTab(tab.id as any)}
+              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                isActive
+                  ? 'bg-[#1FD08A] text-[#15181D] font-black shadow-sm'
+                  : 'bg-[#20252C] text-[#A8B0BB] hover:text-[#F4F2ED] border border-[#282F38]'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 1. PESTAÑA: MURO SOCIAL */}
+      {activeSubTab === 'wall' && (
+        <div className="space-y-4">
+          {/* CREADOR DE POST */}
+          <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 text-[#F4F2ED] space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-[#15181D] border border-[#282F38] flex items-center justify-center font-black text-xs text-[#1FD08A]">
+                {nickname.slice(0, 2).toUpperCase()}
+              </div>
+              <span className="text-xs font-bold text-[#F4F2ED]">Publicar en {currentSquad.name}</span>
+            </div>
+
+            <textarea
+              value={postContent}
+              onChange={(e) => setPostContent(e.target.value)}
+              placeholder="¿Qué tal tu entrenamiento de hoy? Comparte tus sensaciones o foto..."
+              rows={2}
+              className="w-full bg-[#15181D] border border-[#282F38] rounded-2xl p-3 text-xs sm:text-sm text-[#F4F2ED] placeholder-[#A8B0BB]/60 focus:outline-none focus:border-[#1FD08A] resize-none"
+            />
+
+            {/* Vista previa de imagen seleccionada */}
+            {compressedImage && (
+              <div className="relative rounded-2xl overflow-hidden border border-[#282F38] max-h-56 bg-black">
+                <img 
+                  src={compressedImage.dataUrl} 
+                  alt="Previa" 
+                  className="w-full h-full object-cover" 
+                />
+                <button
+                  type="button"
+                  onClick={handleRemoveSelectedImage}
+                  className="absolute top-2 right-2 bg-black/70 text-white p-1.5 rounded-full hover:bg-black transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div className="flex items-center gap-2">
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isCompressing}
+                  className="px-3 py-1.5 bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED] border border-[#282F38] rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Camera className="w-3.5 h-3.5 text-[#1FD08A]" />
+                  <span>{isCompressing ? 'Optimizando...' : 'Añadir foto'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowShareCardModal(true)}
+                  className="px-3 py-1.5 bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED] border border-[#282F38] rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                >
+                  <Award className="w-3.5 h-3.5 text-[#FB923C]" />
+                  <span className="hidden sm:inline">Tarjeta resumen</span>
+                </button>
+              </div>
+
+              <button
+                onClick={handleCreatePost}
+                disabled={(!postContent.trim() && !compressedImage) || isPublishing}
+                className="px-4 py-2 bg-[#1FD08A] hover:bg-[#1ab87a] disabled:opacity-40 text-[#15181D] font-black text-xs rounded-xl flex items-center gap-1.5 shadow-sm transition-all cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{isPublishing ? 'Publicando...' : 'Publicar'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* LISTA DE PUBLICACIONES */}
+          {currentPosts.length === 0 ? (
+            <div className="bg-[#20252C] border border-dashed border-[#282F38] rounded-3xl p-8 text-center text-[#A8B0BB]">
+              <MessageSquare className="w-10 h-10 mx-auto mb-2 opacity-30 text-[#1FD08A]" />
+              <p className="text-sm font-bold text-[#F4F2ED]">El muro está tranquilo hoy</p>
+              <p className="text-xs text-[#A8B0BB] mt-1">Sé el primero en publicar una foto o un comentario sobre tu entreno.</p>
+            </div>
+          ) : (
+            currentPosts.map((post) => {
+              const isPostCaptain = currentSquad.creatorNickname.toLowerCase() === post.nickname.toLowerCase();
+              const commentsOpen = !!expandedComments[post.id];
+
+              return (
+                <div 
+                  key={post.id}
+                  className="bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 text-[#F4F2ED] space-y-3 shadow-md"
+                >
+                  {/* Cabecera del post */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-full bg-[#15181D] border border-[#282F38] flex items-center justify-center font-black text-xs text-[#1FD08A]">
                         {post.nickname.slice(0, 2).toUpperCase()}
                       </div>
-
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-white">{post.nickname}</span>
-                          {post.activityBadge && (
-                            <span className="text-[9px] font-black uppercase tracking-wider text-cyan-300 bg-cyan-950/80 px-2 py-0.5 rounded-full border border-cyan-800">
-                              {post.activityBadge}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-xs sm:text-sm font-black text-[#F4F2ED]">{post.nickname}</p>
+                          {isPostCaptain && (
+                            <span className="text-[10px] text-amber-300 font-bold bg-amber-400/15 px-1.5 py-0.2 rounded">
+                              👑 Capitán
+                            </span>
+                          )}
+                          {post.isDemo && (
+                            <span className="text-[9px] text-[#A8B0BB] bg-[#15181D] px-1.5 py-0.2 rounded border border-[#282F38]">
+                              Ejemplo
                             </span>
                           )}
                         </div>
-                        <p className="text-[10px] text-zinc-500">
-                          {new Date(post.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })} a las {new Date(post.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
+                        <div className="flex items-center gap-1.5 text-[10px] text-[#A8B0BB]">
+                          {post.activityBadge && (
+                            <span className="text-[#1FD08A] font-bold">{post.activityBadge}</span>
+                          )}
+                          <span>·</span>
+                          <span>Hace unas horas</span>
+                        </div>
                       </div>
+                    </div>
+
+                    {/* Menú de moderación */}
+                    <div className="flex items-center gap-1">
+                      {isUserCaptain && (
+                        <button
+                          onClick={() => handleDeletePost(post.id)}
+                          className="p-1.5 text-[#A8B0BB] hover:text-red-400 rounded-lg hover:bg-[#15181D] transition-colors cursor-pointer"
+                          title="Eliminar publicación (Capitán)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleReportPost(post.id)}
+                        className="p-1.5 text-[#A8B0BB] hover:text-amber-400 rounded-lg hover:bg-[#15181D] transition-colors cursor-pointer"
+                        title="Reportar publicación"
+                      >
+                        <Flag className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
 
-                  {/* Contenido de texto */}
-                  <p className="text-xs text-zinc-200 leading-relaxed">
+                  {/* Contenido del post */}
+                  <p className="text-xs sm:text-sm text-[#F4F2ED] leading-relaxed">
                     {post.content}
                   </p>
 
                   {/* Foto adjunta */}
                   {post.imageUrl && (
-                    <div className="relative rounded-2xl overflow-hidden border border-zinc-800 max-h-96 bg-zinc-900 group">
-                      <img
-                        src={post.imageUrl}
-                        alt="Foto de entrenamiento"
-                        className="w-full h-full object-cover rounded-2xl transition-transform duration-300 group-hover:scale-[1.01]"
-                        loading="lazy"
+                    <div 
+                      onClick={() => setFullscreenImage(post.imageUrl!)}
+                      className="rounded-2xl overflow-hidden border border-[#282F38] cursor-pointer hover:opacity-95 transition-opacity max-h-80 bg-black flex items-center justify-center"
+                    >
+                      <img 
+                        src={post.imageUrl} 
+                        alt="Foto de entrenamiento" 
+                        className="w-full h-full object-cover" 
                       />
-                      <button
-                        onClick={() => setFullscreenImage(post.imageUrl!)}
-                        className="absolute bottom-3 right-3 p-2 bg-black/60 hover:bg-black/90 backdrop-blur-md rounded-xl text-white transition-all opacity-0 group-hover:opacity-100"
-                        title="Ver en pantalla completa"
-                      >
-                        <Maximize2 className="w-4 h-4" />
-                      </button>
                     </div>
                   )}
 
-                  {/* Barra de Reacciones de Camaradería */}
-                  <div className="pt-2 border-t border-zinc-850 flex items-center gap-2">
-                    <button
-                      onClick={() => handleReaction(post.id, 'fire')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-zinc-900/90 hover:bg-zinc-850 border border-zinc-800 text-amber-400 transition-all hover:scale-105 active:scale-95"
-                    >
-                      <Flame className="w-3.5 h-3.5" />
-                      <span>{post.reactions.fire || 0}</span>
-                    </button>
+                  {/* Reacciones y Comentarios */}
+                  <div className="pt-2 border-t border-[#282F38] flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => handleReaction(post.id, 'fire')}
+                        className="px-2.5 py-1 bg-[#15181D] hover:bg-[#282F38] rounded-xl text-xs flex items-center gap-1.5 border border-[#282F38] text-[#F4F2ED] transition-colors cursor-pointer active:scale-95"
+                      >
+                        <span>🔥</span>
+                        <span className="font-bold text-[11px]">{post.reactions?.fire || 0}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleReaction(post.id, 'fist')}
+                        className="px-2.5 py-1 bg-[#15181D] hover:bg-[#282F38] rounded-xl text-xs flex items-center gap-1.5 border border-[#282F38] text-[#F4F2ED] transition-colors cursor-pointer active:scale-95"
+                      >
+                        <span>👊</span>
+                        <span className="font-bold text-[11px]">{post.reactions?.fist || 0}</span>
+                      </button>
+
+                      <button
+                        onClick={() => handleReaction(post.id, 'muscle')}
+                        className="px-2.5 py-1 bg-[#15181D] hover:bg-[#282F38] rounded-xl text-xs flex items-center gap-1.5 border border-[#282F38] text-[#F4F2ED] transition-colors cursor-pointer active:scale-95"
+                      >
+                        <span>💪</span>
+                        <span className="font-bold text-[11px]">{post.reactions?.muscle || 0}</span>
+                      </button>
+                    </div>
 
                     <button
-                      onClick={() => handleReaction(post.id, 'fist')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-zinc-900/90 hover:bg-zinc-850 border border-zinc-800 text-cyan-400 transition-all hover:scale-105 active:scale-95"
+                      onClick={() => setExpandedComments((prev) => ({ ...prev, [post.id]: !prev[post.id] }))}
+                      className="text-xs text-[#A8B0BB] hover:text-[#F4F2ED] flex items-center gap-1 cursor-pointer"
                     >
-                      <span>👊</span>
-                      <span>{post.reactions.fist || 0}</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleReaction(post.id, 'muscle')}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-black bg-zinc-900/90 hover:bg-zinc-850 border border-zinc-800 text-emerald-400 transition-all hover:scale-105 active:scale-95"
-                    >
-                      <span>💪</span>
-                      <span>{post.reactions.muscle || 0}</span>
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>{post.comments?.length ? `${post.comments.length} comentarios` : 'Comentar'}</span>
                     </button>
                   </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* ========================================================= */}
-      {/* PESTAÑA 2: RUTINA COMPARTIDA DEL EQUIPO                  */}
-      {/* ========================================================= */}
-      {activeSubTab === 'routine' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between gap-2 border-b border-zinc-200 pb-2">
-            <h4 className="text-base font-black tracking-tight text-zinc-900 flex items-center gap-2">
-              <Layers className="w-5 h-5 text-cyan-600" />
-              Rutina Oficial del Combo
-            </h4>
-
-            {currentSquad.sharedRoutine && (
-              <button
-                onClick={handleCloneRoutineToMyPlan}
-                className="bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1.5 transition-all shadow-sm"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Copiar a mi Plan</span>
-              </button>
-            )}
-          </div>
-
-          {currentSquad.sharedRoutine ? (
-            <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-5 text-white shadow-md space-y-4">
-              <div className="flex justify-between items-start gap-4">
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded-md border border-cyan-800">
-                    Plan Activo del Combo
-                  </span>
-                  <h5 className="text-lg font-black text-white mt-1">
-                    {currentSquad.sharedRoutine.title}
-                  </h5>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    {currentSquad.sharedRoutine.description}
-                  </p>
-                </div>
-              </div>
-
-              {/* Días y ejercicios */}
-              <div className="space-y-3 pt-2">
-                {currentSquad.sharedRoutine.daysData?.map((day) => (
-                  <div key={day.dayId} className="bg-zinc-900/90 border border-zinc-800 rounded-2xl p-3.5">
-                    <p className="text-xs font-black text-zinc-200 mb-2 flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                      {day.title}
-                    </p>
-                    <div className="space-y-1.5">
-                      {day.exercises.map((ex, i) => (
-                        <div key={i} className="flex justify-between items-center text-xs bg-zinc-950/60 p-2 rounded-xl border border-zinc-850">
-                          <span className="font-semibold text-zinc-300">{ex.name}</span>
-                          <span className="font-black text-cyan-400 bg-cyan-950/60 px-2 py-0.5 rounded-md text-[11px]">
-                            {ex.sets} × {ex.reps}
-                          </span>
+                  {/* Hilo de comentarios (desplegable) */}
+                  {commentsOpen && (
+                    <div className="pt-2 border-t border-[#282F38] space-y-2.5">
+                      {/* Lista de comentarios existentes */}
+                      {(post.comments || []).map((c) => (
+                        <div key={c.id} className="bg-[#15181D] p-2.5 rounded-xl border border-[#282F38] text-xs">
+                          <div className="flex items-center justify-between text-[10px] text-[#A8B0BB] mb-0.5">
+                            <span className="font-bold text-[#F4F2ED]">{c.nickname}</span>
+                            <span>Hace un momento</span>
+                          </div>
+                          <p className="text-[#F4F2ED]">{c.content}</p>
                         </div>
                       ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
 
-              <div className="pt-2">
-                <button
-                  onClick={handleCloneRoutineToMyPlan}
-                  className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow-md"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  <span>Sincronizar y Entrenar este Plan en mi Semana</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-zinc-50 border border-dashed border-zinc-300 rounded-3xl p-8 text-center text-zinc-500">
-              <Layers className="w-8 h-8 mx-auto text-zinc-400 mb-2" />
-              <p className="text-xs font-bold text-zinc-700">Este combo aún no tiene una rutina compartida fija.</p>
-              <p className="text-[11px] text-zinc-500 mt-1 max-w-sm mx-auto">
-                El capitán puede compartir su rutina activa o exportar un bloque de 4 días para que todo el combo entrene en sincronía.
-              </p>
-            </div>
+                      {/* Input para añadir comentario */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Escribe un comentario..."
+                          value={commentInputs[post.id] || ''}
+                          onChange={(e) => setCommentInputs((prev) => ({ ...prev, [post.id]: e.target.value }))}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleAddComment(post.id);
+                          }}
+                          className="flex-1 bg-[#15181D] border border-[#282F38] rounded-xl px-3 py-1.5 text-xs text-[#F4F2ED] placeholder-[#A8B0BB]/60 focus:outline-none focus:border-[#1FD08A]"
+                        />
+                        <button
+                          onClick={() => handleAddComment(post.id)}
+                          className="p-2 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] rounded-xl transition-all cursor-pointer"
+                          title="Enviar comentario"
+                        >
+                          <Send className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
           )}
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* PESTAÑA 3: CHECK-IN DIARIO & ROSTER DEL EQUIPO            */}
-      {/* ========================================================= */}
-      {activeSubTab === 'checkin' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between gap-2 border-b border-zinc-200 pb-2">
-            <h4 className="text-base font-black tracking-tight text-zinc-900 flex items-center gap-2">
-              <Flame className="w-5 h-5 text-amber-500" />
-              Asistencia &amp; Racha de Hoy
-            </h4>
-            <span className="text-xs font-bold text-zinc-500">
-              {currentMembers.filter((m) => m.hasCheckedInToday).length} / {currentMembers.length} entrenaron hoy
-            </span>
-          </div>
-
-          {/* PODIO DE HONOR DEL COMBO (TOP 3 ATLETAS) */}
-          <div className="bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 border border-zinc-800 rounded-3xl p-5 shadow-xl relative overflow-hidden">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 rounded-xl bg-amber-500/20 border border-amber-500/40 text-amber-400">
-                  <Trophy className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="text-sm font-black text-white flex items-center gap-2">
-                    Podio de Honor del Combo
-                    <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2 py-0.5 rounded-full font-bold">
-                      TOP CONSISTENCIA
-                    </span>
-                  </h4>
-                  <p className="text-[10px] text-zinc-400">Clasificación en vivo por mayor racha de días consecutivos</p>
-                </div>
-              </div>
+      {/* 2. PESTAÑA: RUTINAS COMPARTIDAS */}
+      {activeSubTab === 'routine' && (
+        <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-5 text-[#F4F2ED] space-y-4 shadow-xl">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A] block">
+                Plan de entrenamiento oficial
+              </span>
+              <h3 className="text-base sm:text-lg font-black text-[#F4F2ED]">
+                {currentSquad.sharedRoutine?.title || 'Rutina del combo'}
+              </h3>
+              <p className="text-xs text-[#A8B0BB] mt-0.5">
+                {currentSquad.sharedRoutine?.description || 'Rutina diseñada y compartida para el equipo.'}
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* 1er Lugar - ORO */}
-              {podiumMembers[0] && (
-                <div className="bg-amber-950/40 border border-amber-500/70 rounded-2xl p-3.5 flex flex-col justify-between shadow-lg relative order-1 sm:order-2 ring-1 ring-amber-500/30">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl">🥇</span>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-300 bg-amber-950/90 px-2 py-0.5 rounded-md border border-amber-600">
-                      1º Puesto
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-sm font-black text-white truncate">{podiumMembers[0].nickname}</p>
-                    <p className="text-xs font-bold text-amber-400 flex items-center gap-1 mt-0.5">
-                      <Flame className="w-3.5 h-3.5" /> {podiumMembers[0].streakDays} días de racha
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* 2do Lugar - PLATA */}
-              {podiumMembers[1] && (
-                <div className="bg-zinc-900/90 border border-slate-400/50 rounded-2xl p-3.5 flex flex-col justify-between shadow-md order-2 sm:order-1">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl">🥈</span>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-300 bg-zinc-800 px-2 py-0.5 rounded-md border border-slate-600">
-                      2º Puesto
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-zinc-200 truncate">{podiumMembers[1].nickname}</p>
-                    <p className="text-[11px] font-bold text-slate-300 flex items-center gap-1 mt-0.5">
-                      <Flame className="w-3 h-3 text-slate-400" /> {podiumMembers[1].streakDays} días de racha
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* 3er Lugar - BRONCE */}
-              {podiumMembers[2] && (
-                <div className="bg-zinc-900/90 border border-amber-800/50 rounded-2xl p-3.5 flex flex-col justify-between shadow-md order-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-2xl">🥉</span>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 bg-zinc-800 px-2 py-0.5 rounded-md border border-amber-900">
-                      3º Puesto
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-xs font-black text-zinc-200 truncate">{podiumMembers[2].nickname}</p>
-                    <p className="text-[11px] font-bold text-amber-500 flex items-center gap-1 mt-0.5">
-                      <Flame className="w-3 h-3 text-amber-600" /> {podiumMembers[2].streakDays} días de racha
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+            <button
+              onClick={handleCopyRoutineToWeekly}
+              className="px-4 py-2.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
+            >
+              <Copy className="w-4 h-4" />
+              <span>Copiar a mi plan semanal</span>
+            </button>
           </div>
 
-          {/* LISTA DE MIEMBROS */}
-          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-4 text-white shadow-md space-y-2.5">
-            {currentMembers.map((member) => (
-              <div
-                key={member.id}
-                className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${
-                  member.hasCheckedInToday
-                    ? 'bg-emerald-950/30 border-emerald-800/60'
-                    : 'bg-zinc-900/60 border-zinc-800'
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-black ${
-                    member.hasCheckedInToday
-                      ? 'bg-emerald-500 text-zinc-950'
-                      : 'bg-zinc-800 text-zinc-400'
-                  }`}>
-                    {member.nickname.slice(0, 2).toUpperCase()}
-                  </div>
-
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-black text-white">
-                        {member.nickname}
-                      </span>
-                      {member.role === 'leader' && (
-                        <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/40 px-1.5 rounded-sm font-bold">
-                          CAPITÁN
-                        </span>
-                      )}
+          {/* Días y ejercicios de la rutina */}
+          <div className="space-y-3 pt-2">
+            {(currentSquad.sharedRoutine?.daysData || []).map((day) => (
+              <div key={day.dayId} className="bg-[#15181D] border border-[#282F38] rounded-2xl p-4 space-y-2">
+                <p className="text-xs font-black text-[#1FD08A] uppercase tracking-wider">
+                  {day.title}
+                </p>
+                <div className="space-y-1.5">
+                  {day.exercises.map((ex, idx) => (
+                    <div key={idx} className="flex items-center justify-between text-xs py-1 border-b border-[#282F38]/50 last:border-0">
+                      <span className="font-semibold text-[#F4F2ED]">{ex.name}</span>
+                      <span className="text-[11px] text-[#A8B0BB] font-mono">{ex.sets} series · {ex.reps}</span>
                     </div>
-                    <p className="text-[10px] text-zinc-400 leading-tight">
-                      {member.lastActivityText || 'Sin registro reciente'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {member.hasCheckedInToday ? (
-                    <span className="flex items-center gap-1 text-[11px] font-black text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-full border border-emerald-800">
-                      <Flame className="w-3 h-3" /> {member.streakDays}d racha
-                    </span>
-                  ) : (
-                    <span className="text-[10px] font-bold text-zinc-400 bg-zinc-800 px-2 py-0.5 rounded-full">
-                      Pendiente hoy
-                    </span>
-                  )}
-
-                  {/* Botón compartir racha si es el usuario actual */}
-                  {member.nickname.toLowerCase() === nickname.toLowerCase() && member.streakDays > 0 && (
-                    <button
-                      onClick={handleShareStreakWhatsApp}
-                      className="p-1.5 bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 rounded-xl border border-emerald-500/50 transition-colors"
-                      title="Presumir mi racha en WhatsApp"
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                  ))}
                 </div>
               </div>
             ))}
           </div>
+        </div>
+      )}
 
-          {/* FEED DE CHECK-INS RECIENTES */}
-          <div className="space-y-2 pt-2">
-            <h5 className="text-xs font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-              <MessageSquare className="w-3.5 h-3.5 text-cyan-600" /> Muro de Asistencia Reciente
-            </h5>
+      {/* 3. PESTAÑA: EQUIPO (ROSTER DE MIEMBROS) */}
+      {activeSubTab === 'roster' && (
+        <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-5 text-[#F4F2ED] space-y-4 shadow-xl">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm sm:text-base font-black text-[#F4F2ED]">
+              Miembros de {currentSquad.name} ({currentMembers.length})
+            </h3>
+            <button
+              onClick={() => setShowJoinModal(true)}
+              className="text-xs text-[#1FD08A] font-bold hover:underline cursor-pointer flex items-center gap-1"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Unirse con otro código</span>
+            </button>
+          </div>
 
-            <div className="space-y-2">
-              {currentCheckins.slice(0, 6).map((chk) => (
-                <div key={chk.id} className="bg-white border border-zinc-200 rounded-2xl p-3 shadow-sm text-zinc-900">
-                  <div className="flex justify-between items-center text-xs font-bold mb-1">
-                    <span className="text-cyan-700 font-extrabold flex items-center gap-1">
-                      <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                      {chk.nickname}
-                    </span>
-                    <span className="text-[10px] text-zinc-400">
-                      {new Date(chk.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+          <div className="space-y-2">
+            {currentMembers.map((member) => {
+              const isLead = member.role === 'leader';
+              const hasChecked = hasUserCheckedInToday(member.lastCheckinAt);
+
+              return (
+                <div 
+                  key={member.id}
+                  className="bg-[#15181D] border border-[#282F38] p-3 rounded-2xl flex items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="w-10 h-10 rounded-full flex items-center justify-center font-black text-xs border-2"
+                      style={{ borderColor: disciplineColor, color: '#F4F2ED', backgroundColor: '#20252C' }}
+                    >
+                      {member.nickname.slice(0, 2).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs sm:text-sm font-black text-[#F4F2ED]">{member.nickname}</p>
+                        {isLead && (
+                          <span className="text-[10px] text-amber-300 font-bold bg-amber-400/20 px-1.5 py-0.5 rounded">
+                            👑 Capitán
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-[#A8B0BB]">
+                        Racha: <strong className="text-[#1FD08A]">{member.streakDays} días</strong> {hasChecked ? '· Entrenó hoy ✓' : '· Descanso'}
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-xs font-black text-zinc-800">
-                    {chk.activityTitle}
-                  </p>
-                  {chk.details && (
-                    <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">
-                      "{chk.details}"
-                    </p>
-                  )}
+
+                  <div className="flex items-center gap-2">
+                    {hasChecked ? (
+                      <span className="w-3 h-3 rounded-full bg-[#1FD08A]" title="Entrenó hoy" />
+                    ) : (
+                      <span className="w-3 h-3 rounded-full bg-[#A8B0BB]/30" title="Pendiente de entrenar hoy" />
+                    )}
+
+                    {isUserCaptain && member.nickname.toLowerCase() !== nickname.toLowerCase() && (
+                      <button
+                        onClick={() => handleRemoveMember(member.nickname)}
+                        className="p-1.5 text-[#A8B0BB] hover:text-red-400 rounded-lg hover:bg-[#20252C] transition-colors cursor-pointer"
+                        title="Expulsar del combo"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
-              ))}
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 4. PESTAÑA: RETOS & QUEDADAS */}
+      {activeSubTab === 'challenges' && (
+        <div className="space-y-4">
+          {/* RETOS SEMANALES DE CONSTANCIA */}
+          <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-5 text-[#F4F2ED] space-y-4 shadow-xl">
+            <div className="flex items-center gap-2">
+              <Trophy className="w-5 h-5 text-amber-400" />
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-[#F4F2ED]">Retos de constancia del equipo</h3>
+                <p className="text-xs text-[#A8B0BB]">Metas grupales para sumar entre todos sin importar tu nivel.</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {/* Reto 1: Sesiones totales */}
+              <div className="bg-[#15181D] border border-[#282F38] p-4 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-[#F4F2ED]">20 entrenamientos en equipo esta semana</span>
+                  <span className="text-[#1FD08A] font-black">14 / 20 sesiones (70%)</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-[#20252C] overflow-hidden">
+                  <div className="h-full bg-[#1FD08A] rounded-full" style={{ width: '70%' }} />
+                </div>
+                <p className="text-[10px] text-[#A8B0BB]">Faltan 6 entrenamientos antes del domingo para completar el reto.</p>
+              </div>
+
+              {/* Reto 2: Kilómetros acumulados */}
+              <div className="bg-[#15181D] border border-[#282F38] p-4 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-[#F4F2ED]">50 kilómetros de carrera acumulados</span>
+                  <span className="text-[#5B8DEF] font-black">38 / 50 km (76%)</span>
+                </div>
+                <div className="w-full h-2 rounded-full bg-[#20252C] overflow-hidden">
+                  <div className="h-full bg-[#5B8DEF] rounded-full" style={{ width: '76%' }} />
+                </div>
+                <p className="text-[10px] text-[#A8B0BB]">¡Solo faltan 12 km entre todos para ganar la medalla de equipo!</p>
+              </div>
+            </div>
+          </div>
+
+          {/* QUEDADAS DE ENTRENAMIENTO (MEETUPS) */}
+          <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-5 text-[#F4F2ED] space-y-4 shadow-xl">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-[#1FD08A]" />
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-[#F4F2ED]">Quedadas de entrenamiento</h3>
+                  <p className="text-xs text-[#A8B0BB]">Entrenen juntos en vivo en el gimnasio o al aire libre.</p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowNewMeetupModal(true)}
+                className="px-3 py-2 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Proponer quedada</span>
+              </button>
+            </div>
+
+            {currentMeetups.length === 0 ? (
+              <div className="bg-[#15181D] border border-dashed border-[#282F38] rounded-2xl p-6 text-center text-[#A8B0BB]">
+                <p className="text-xs font-semibold text-[#F4F2ED]">No hay quedadas programadas próximamente.</p>
+                <p className="text-[11px] text-[#A8B0BB] mt-0.5">Propón un día, hora y lugar para entrenar juntos.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {currentMeetups.map((meet) => {
+                  const userIsGoing = meet.attendees.includes(nickname);
+                  const userDeclined = meet.declined.includes(nickname);
+
+                  return (
+                    <div key={meet.id} className="bg-[#15181D] border border-[#282F38] rounded-2xl p-4 space-y-3">
+                      <div>
+                        <div className="flex items-center gap-2 text-[10px] text-[#1FD08A] font-black uppercase tracking-wider mb-0.5">
+                          <span>{meet.date}</span>
+                          <span>·</span>
+                          <span>{meet.time}</span>
+                        </div>
+                        <h4 className="text-sm font-black text-[#F4F2ED]">{meet.title}</h4>
+                        <p className="text-xs text-[#A8B0BB] flex items-center gap-1.5 mt-1">
+                          <MapPin className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                          <span>{meet.location}</span>
+                        </p>
+                      </div>
+
+                      {/* Asistentes */}
+                      <div className="pt-2 border-t border-[#282F38] flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-xs text-[#A8B0BB]">
+                          <span>Asistentes ({meet.attendees.length}):</span>
+                          <span className="font-bold text-[#F4F2ED]">{meet.attendees.join(', ')}</span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleRespondMeetup(meet.id, true)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              userIsGoing
+                                ? 'bg-[#1FD08A] text-[#15181D] font-black'
+                                : 'bg-[#20252C] text-[#A8B0BB] hover:text-[#F4F2ED] border border-[#282F38]'
+                            }`}
+                          >
+                            ✓ Voy
+                          </button>
+                          <button
+                            onClick={() => handleRespondMeetup(meet.id, false)}
+                            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                              userDeclined
+                                ? 'bg-red-500/20 text-red-300 border border-red-500'
+                                : 'bg-[#20252C] text-[#A8B0BB] hover:text-[#F4F2ED] border border-[#282F38]'
+                            }`}
+                          >
+                            No puedo
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CÓDIGO QR PARA INVITAR */}
+      {showQrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#20252C] border border-[#282F38] rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-black text-[#F4F2ED]">Código QR de invitación</h3>
+              <button 
+                onClick={() => setShowQrModal(false)}
+                className="p-1.5 text-[#A8B0BB] hover:text-[#F4F2ED] rounded-xl hover:bg-[#15181D]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#A8B0BB]">
+              Pídele a tu compañero que escanee este código con la cámara de su celular para unirse a <strong>{currentSquad.name}</strong>.
+            </p>
+
+            <div className="p-4 bg-white rounded-2xl mx-auto w-48 h-48 flex items-center justify-center shadow-md">
+              <img 
+                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(inviteUrl)}`} 
+                alt="QR Code" 
+                className="w-full h-full"
+              />
+            </div>
+
+            <div className="bg-[#15181D] border border-[#282F38] p-3 rounded-2xl flex items-center justify-between">
+              <span className="font-mono text-sm font-black text-[#1FD08A]">#{currentSquad.code}</span>
+              <button
+                onClick={() => handleCopyCode(currentSquad.code)}
+                className="text-xs font-bold text-[#F4F2ED] hover:text-[#1FD08A] flex items-center gap-1 cursor-pointer"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copiar</span>
+              </button>
             </div>
           </div>
         </div>
       )}
-      </>
-    )}
 
-      {/* MODAL FOTO EN PANTALLA COMPLETA */}
-      {fullscreenImage && (
-        <div 
-          onClick={() => setFullscreenImage(null)}
-          className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fadeIn cursor-pointer"
-        >
-          <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-3xl" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setFullscreenImage(null)}
-              className="absolute top-4 right-4 p-2 bg-black/60 hover:bg-black/90 rounded-full text-white transition-colors z-10"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            <img
-              src={fullscreenImage}
-              alt="Foto ampliada"
-              className="max-h-[85vh] max-w-full object-contain rounded-3xl shadow-2xl"
-            />
-          </div>
-        </div>
-      )}
-
-      {/* MODAL CREAR CUADRILLA */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl max-w-md w-full p-6 text-white shadow-2xl relative">
-            <button
-              onClick={() => setShowCreateModal(false)}
-              className="absolute top-4 right-4 p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-xl transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="text-lg font-black text-white flex items-center gap-2 mb-1">
-              <Plus className="w-5 h-5 text-cyan-400" />
-              Crear Nuevo Combo
-            </h3>
-            <p className="text-xs text-zinc-400 mb-5">
-              Crea tu grupo de entrenamiento con código alfanumérico para invitar a tus compañeros del combo.
-            </p>
-
-            <form onSubmit={handleCreateSquad} className="space-y-4">
-              <div>
-                <label className="text-xs font-bold text-zinc-300 block mb-1">
-                  Nombre del Combo
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej: Los Titanes, Iron Combo, Team Cali..."
-                  value={newSquadName}
-                  onChange={(e) => setNewSquadName(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-zinc-300 block mb-1">
-                  Lema o Frase de Guerra
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej: Corremos con piernas fatigadas..."
-                  value={newSquadMotto}
-                  onChange={(e) => setNewSquadMotto(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-zinc-300 block mb-1">
-                  Disciplina Principal
-                </label>
-                <select
-                  value={newSquadDiscipline}
-                  onChange={(e) => setNewSquadDiscipline(e.target.value as SquadDiscipline)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-400"
-                >
-                  <option value="hybrid">Híbrido (Todo terreno)</option>
-                  <option value="hyrox_ocr">Hyrox &amp; Carreras OCR</option>
-                  <option value="strength">Fuerza &amp; Musculación</option>
-                  <option value="running">Running Polarizado 80/20</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2.5 pt-1">
-                <input
-                  type="checkbox"
-                  id="includeRoutine"
-                  checked={includeMyRoutine}
-                  onChange={(e) => setIncludeMyRoutine(e.target.checked)}
-                  className="w-4 h-4 rounded text-cyan-500 focus:ring-0 bg-zinc-900 border-zinc-700"
-                />
-                <label htmlFor="includeRoutine" className="text-xs text-zinc-300 cursor-pointer">
-                  Compartir mi rutina activa actual con el combo
-                </label>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-black rounded-xl text-xs transition-colors mt-2 shadow-md shadow-cyan-500/20"
-              >
-                Crear mi Combo 🔥
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL UNIRSE CON CÓDIGO */}
-      {showJoinModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl max-w-sm w-full p-6 text-white shadow-2xl relative">
-            <button
-              onClick={() => setShowJoinModal(false)}
-              className="absolute top-4 right-4 p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-xl transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="text-lg font-black text-white flex items-center gap-2 mb-1">
-              <UserPlus className="w-5 h-5 text-cyan-400" />
-              Unirme a un Combo
-            </h3>
-            <p className="text-xs text-zinc-400 mb-5">
-              Ingresa el código alfanumérico de 6 caracteres que te compartió tu compañero del combo (ej. HYR202).
-            </p>
-
-            <form onSubmit={handleJoinSquad} className="space-y-4">
-              <div>
-                <input
-                  type="text"
-                  maxLength={7}
-                  required
-                  placeholder="CÓDIGO (ej. HYR202)"
-                  value={joinCodeInput}
-                  onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-center text-lg font-black tracking-widest font-mono text-cyan-300 focus:outline-none focus:border-cyan-400"
-                />
-                {joinError && (
-                  <p className="text-[11px] text-red-400 font-bold mt-1.5">{joinError}</p>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                className="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-zinc-950 font-black rounded-xl text-xs transition-colors shadow-md"
-              >
-                Unirme Ahora
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL REGISTRAR CHECK-IN */}
+      {/* MODAL CHECK-IN DIARIO */}
       {showCheckinModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
-          <div className="bg-zinc-950 border border-zinc-800 rounded-3xl max-w-md w-full p-6 text-white shadow-2xl relative">
-            <button
-              onClick={() => setShowCheckinModal(false)}
-              className="absolute top-4 right-4 p-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white rounded-xl transition-colors"
-            >
-              <X className="w-5 h-5" />
-            </button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#20252C] text-[#F4F2ED] rounded-3xl max-w-md w-full p-6 border border-[#282F38] shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#282F38] mb-4">
+              <div className="flex items-center gap-2">
+                <Flame className="w-5 h-5 text-[#1FD08A]" />
+                <h3 className="font-extrabold text-base text-[#F4F2ED]">Check-in diario de entrenamiento</h3>
+              </div>
+              <button
+                onClick={() => setShowCheckinModal(false)}
+                className="p-1.5 hover:bg-[#15181D] rounded-xl text-[#A8B0BB] hover:text-[#F4F2ED] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-            <h3 className="text-lg font-black text-white flex items-center gap-2 mb-1">
-              <Flame className="w-5 h-5 text-emerald-400" />
-              Check-in Diario de Entrenamiento
-            </h3>
-            <p className="text-xs text-zinc-400 mb-5">
-              Marca tu asistencia en {currentSquad.name} para mantener tu racha activa de días consecutivos en el combo.
+            <p className="text-xs text-[#A8B0BB] mb-4">
+              Marca tu asistencia en <strong>{currentSquad.name}</strong> para mantener tu racha activa de días consecutivos.
             </p>
 
             <form onSubmit={handleRecordCheckin} className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-zinc-300 block mb-1">
-                  Tipo de Actividad Realizada
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1.5">
+                  Tipo de actividad
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { id: 'strength', label: 'Musculación' },
-                    { id: 'running', label: 'Running Z2/Series' },
+                    { id: 'running', label: 'Running' },
                     { id: 'hyrox_ocr', label: 'Hyrox / OCR' },
-                    { id: 'hiit', label: 'HIIT Metabólico' }
+                    { id: 'hiit', label: 'HIIT / Cardio' }
                   ].map((t) => (
                     <button
                       key={t.id}
                       type="button"
-                      onClick={() => setCheckinType(t.id as SquadCheckin['activityType'])}
-                      className={`p-2 rounded-xl text-xs font-bold border transition-all ${
+                      onClick={() => setCheckinType(t.id as any)}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                         checkinType === t.id
-                          ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                          : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                          ? 'bg-[#1FD08A]/15 border-[#1FD08A] text-[#1FD08A]'
+                          : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED]'
                       }`}
                     >
                       {t.label}
@@ -1687,61 +1583,316 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
               </div>
 
               <div>
-                <label className="text-xs font-bold text-zinc-300 block mb-1">
-                  Título de la Sesión
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1.5">
+                  Título de la sesión
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Día 1 Torso Pesado, 10 km Z2..."
+                  placeholder="Ej: Día 1 Torso Pesado, 8K Z2, etc."
                   value={checkinTitle}
                   onChange={(e) => setCheckinTitle(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
                 />
               </div>
 
               <div>
-                <label className="text-xs font-bold text-zinc-300 block mb-1">
-                  Sensación o Comentario (Opcional)
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1.5">
+                  Sensación o comentario (opcional)
                 </label>
                 <input
                   type="text"
-                  placeholder="Ej: RIR 2 respetado, buena congestión..."
+                  placeholder="Ej: RIR 2 respetado, buena energía..."
                   value={checkinDetails}
                   onChange={(e) => setCheckinDetails(e.target.value)}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-emerald-400"
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
                 />
               </div>
 
               <button
                 type="submit"
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black rounded-xl text-xs transition-colors mt-2 shadow-md"
+                className="w-full py-3.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs transition-all shadow-md mt-2 cursor-pointer"
               >
-                Confirmar Check-in de Hoy 🔥
+                Confirmar check-in de hoy 🔥
               </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL SOFT WALL («MODO PUERTA ABIERTA») */}
-      <SoftWallModal
-        isOpen={!!softWallTrigger}
-        trigger={softWallTrigger || 'join_squad'}
-        onClose={() => setSoftWallTrigger(null)}
-        onContinueAsGuest={() => {
-          const trigger = softWallTrigger;
-          setSoftWallTrigger(null);
-          if (trigger === 'join_squad') {
-            setShowJoinModal(true);
-          } else if (trigger === 'share_routine') {
-            setShowCreateModal(true);
-          } else if (trigger === 'upload_photo') {
-            fileInputRef.current?.click();
-          }
-        }}
-      />
+      {/* MODAL TARJETA DE RESUMEN COMPARTIBLE */}
+      {showShareCardModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#20252C] border border-[#282F38] rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+            <div className="flex justify-between items-center">
+              <h3 className="text-base font-black text-[#F4F2ED]">Tarjeta de resumen</h3>
+              <button 
+                onClick={() => setShowShareCardModal(false)}
+                className="p-1.5 text-[#A8B0BB] hover:text-[#F4F2ED] rounded-xl hover:bg-[#15181D]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
+            {/* Tarjeta compartible de marca */}
+            <div className="bg-gradient-to-br from-[#15181D] to-[#20252C] border-2 border-[#1FD08A] p-5 rounded-2xl text-left space-y-3 shadow-lg">
+              <div className="flex items-center justify-between">
+                <span className="font-black text-sm text-[#1FD08A] tracking-wider uppercase">FitMax</span>
+                <span className="text-[10px] text-[#A8B0BB]">Entrenamiento Inteligente</span>
+              </div>
+
+              <div>
+                <p className="text-xs text-[#A8B0BB]">Atleta</p>
+                <p className="text-base font-black text-[#F4F2ED]">{nickname}</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#282F38]">
+                <div>
+                  <p className="text-[10px] text-[#A8B0BB]">Disciplina</p>
+                  <p className="text-xs font-bold text-[#1FD08A]">{getDisciplineName(currentSquad.discipline)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#A8B0BB]">Racha activa</p>
+                  <p className="text-xs font-bold text-[#FB923C]">{userMemberInfo?.streakDays || 1} días 🔥</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setShowShareCardModal(false);
+                  if (onNotification) onNotification('¡Tarjeta publicada en tu muro!');
+                }}
+                className="flex-1 py-3 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs transition-all cursor-pointer"
+              >
+                Publicar en combo
+              </button>
+              <button
+                onClick={() => {
+                  setShowShareCardModal(false);
+                  handleShareSquadWhatsApp();
+                }}
+                className="px-4 py-3 bg-[#15181D] hover:bg-[#282F38] text-[#F4F2ED] rounded-xl text-xs font-bold border border-[#282F38] cursor-pointer"
+              >
+                WhatsApp
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PROPONER NUEVA QUEDADA */}
+      {showNewMeetupModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#20252C] text-[#F4F2ED] rounded-3xl max-w-md w-full p-6 border border-[#282F38] shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#282F38] mb-4">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-[#1FD08A]" />
+                <h3 className="font-extrabold text-base text-[#F4F2ED]">Proponer quedada de entrenamiento</h3>
+              </div>
+              <button
+                onClick={() => setShowNewMeetupModal(false)}
+                className="p-1.5 hover:bg-[#15181D] rounded-xl text-[#A8B0BB] hover:text-[#F4F2ED]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateMeetup} className="space-y-3.5">
+              <div>
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Título de la quedada</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Simulacro Hyrox en Parque Virrey"
+                  value={newMeetupTitle}
+                  onChange={(e) => setNewMeetupTitle(e.target.value)}
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Día</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej: Sábado 18 Oct"
+                    value={newMeetupDate}
+                    onChange={(e) => setNewMeetupDate(e.target.value)}
+                    className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Hora</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej: 08:00 AM"
+                    value={newMeetupTime}
+                    onChange={(e) => setNewMeetupTime(e.target.value)}
+                    className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Lugar de encuentro</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Parque Simón Bolívar, entrada principal"
+                  value={newMeetupLocation}
+                  onChange={(e) => setNewMeetupLocation(e.target.value)}
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs transition-all shadow-md mt-2 cursor-pointer"
+              >
+                Publicar quedada para el equipo
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL CREAR COMBO */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#20252C] text-[#F4F2ED] rounded-3xl max-w-md w-full p-6 border border-[#282F38] shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#282F38] mb-4">
+              <h3 className="font-extrabold text-base text-[#F4F2ED]">Crear nuevo combo</h3>
+              <button
+                onClick={() => setShowCreateModal(false)}
+                className="p-1.5 hover:bg-[#15181D] rounded-xl text-[#A8B0BB] hover:text-[#F4F2ED]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateNewSquad} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Nombre del combo</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: Titanes del Cross, Corredores Z2..."
+                  value={newSquadName}
+                  onChange={(e) => setNewSquadName(e.target.value)}
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Lema o motivación</label>
+                <input
+                  type="text"
+                  placeholder="Ej: La constancia no se negocia."
+                  value={newSquadMotto}
+                  onChange={(e) => setNewSquadMotto(e.target.value)}
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Disciplina principal</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'hybrid', label: 'Híbrido' },
+                    { id: 'strength', label: 'Musculación' },
+                    { id: 'running', label: 'Running' },
+                    { id: 'hyrox_ocr', label: 'Hyrox / OCR' }
+                  ].map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setNewSquadDiscipline(d.id as any)}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        newSquadDiscipline === d.id
+                          ? 'bg-[#1FD08A]/15 border-[#1FD08A] text-[#1FD08A]'
+                          : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB]'
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs transition-all shadow-md mt-2 cursor-pointer"
+              >
+                Crear combo e invitar amigos
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL UNIRSE CON CÓDIGO */}
+      {showJoinModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#20252C] text-[#F4F2ED] rounded-3xl max-w-md w-full p-6 border border-[#282F38] shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#282F38] mb-4">
+              <h3 className="font-extrabold text-base text-[#F4F2ED]">Unirme a un combo existente</h3>
+              <button
+                onClick={() => setShowJoinModal(false)}
+                className="p-1.5 hover:bg-[#15181D] rounded-xl text-[#A8B0BB] hover:text-[#F4F2ED]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleJoinSquadByCode} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">
+                  Código de invitación (6 caracteres)
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Ej: HYR902, RUN820..."
+                  value={joinCodeInput}
+                  onChange={(e) => setJoinCodeInput(e.target.value.toUpperCase())}
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-sm font-mono text-[#F4F2ED] uppercase tracking-wider focus:outline-none focus:border-[#1FD08A]"
+                />
+                {joinError && (
+                  <p className="text-[11px] text-red-400 mt-1 flex items-center gap-1">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>{joinError}</span>
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs transition-all shadow-md mt-2 cursor-pointer"
+              >
+                Unirme al combo
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* VISOR DE FOTO PANTALLA COMPLETA */}
+      {fullscreenImage && (
+        <div 
+          onClick={() => setFullscreenImage(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/95 p-4 animate-fadeIn cursor-zoom-out"
+        >
+          <img 
+            src={fullscreenImage} 
+            alt="Foto completa" 
+            className="max-w-full max-h-[90vh] object-contain rounded-2xl" 
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -60,6 +60,37 @@ export interface SquadCheckin {
   createdAt: number;
 }
 
+export interface SquadComment {
+  id: string;
+  nickname: string;
+  content: string;
+  createdAt: number;
+}
+
+export interface SquadMeetup {
+  id: string;
+  squadId: string;
+  creatorNickname: string;
+  title: string;
+  date: string;
+  time: string;
+  location: string;
+  attendees: string[]; // nicknames
+  declined: string[];
+  createdAt: number;
+}
+
+export interface SquadChallenge {
+  id: string;
+  title: string;
+  description: string;
+  targetCount: number;
+  currentCount: number;
+  unit: string;
+  discipline: SquadDiscipline;
+  daysRemaining: number;
+}
+
 export interface SquadPost {
   id: string;
   squadId: string;
@@ -68,11 +99,20 @@ export interface SquadPost {
   content: string;
   imageUrl?: string;
   activityBadge?: string;
+  discipline?: SquadDiscipline;
+  stats?: {
+    durationMinutes?: number;
+    volumeKg?: number;
+    distanceKm?: number;
+    pace?: string;
+  };
   reactions: {
     fire: number;
     fist: number;
     muscle: number;
   };
+  comments?: SquadComment[];
+  isDemo?: boolean;
   createdAt: number;
 }
 
@@ -84,7 +124,12 @@ export const DEFAULT_SQUAD_POSTS: Record<string, SquadPost[]> = {
       nickname: 'Coach_Marcos',
       content: '¡Día de simulacro cerrado! Recuerden no apresurarse en los primeros 1000m de carrera tras el trineo; mantengan la cadencia corta.',
       activityBadge: 'Simulacro Hyrox',
+      discipline: 'hyrox_ocr',
       reactions: { fire: 4, fist: 3, muscle: 2 },
+      isDemo: true,
+      comments: [
+        { id: 'c_1', nickname: 'Lucas_OCR', content: '¡Totalmente de acuerdo, la cadencia salva el día!', createdAt: Date.now() - 3600000 * 2 }
+      ],
       createdAt: Date.now() - 3600000 * 3
     },
     {
@@ -93,7 +138,9 @@ export const DEFAULT_SQUAD_POSTS: Record<string, SquadPost[]> = {
       nickname: 'Lucas_OCR',
       content: 'Completé las 4 rondas de cuelgues con toalla. El agarre quemaba pero salió todo.',
       activityBadge: 'Agarre OCR',
+      discipline: 'hyrox_ocr',
       reactions: { fire: 3, fist: 2, muscle: 4 },
+      isDemo: true,
       createdAt: Date.now() - 3600000 * 6
     }
   ],
@@ -104,7 +151,9 @@ export const DEFAULT_SQUAD_POSTS: Record<string, SquadPost[]> = {
       nickname: 'Elena_Run',
       content: 'Rodaje regenerativo de 12 km completado en Zona 2 estricta (138 ppm media). Mañana descansamos para las series del jueves.',
       activityBadge: 'Rodaje Z2 12K',
+      discipline: 'running',
       reactions: { fire: 5, fist: 2, muscle: 1 },
+      isDemo: true,
       createdAt: Date.now() - 3600000 * 4
     }
   ],
@@ -115,7 +164,9 @@ export const DEFAULT_SQUAD_POSTS: Record<string, SquadPost[]> = {
       nickname: 'Carlos_Lift',
       content: 'Semana 4 del mesociclo: subí a 85kg en banca manteniendo RIR 1. La sobrecarga progresiva no falla.',
       activityBadge: 'Torso A - Semana 4',
+      discipline: 'strength',
       reactions: { fire: 6, fist: 5, muscle: 7 },
+      isDemo: true,
       createdAt: Date.now() - 3600000 * 5
     }
   ]
