@@ -131,4 +131,35 @@ describe('findExerciseDetail - Verificación estricta de técnica y fotos reales
     expect(res.demoImages?.[0]).toContain('Cable_Crunch');
     expect(res.demoImages?.[0]).not.toContain('Ab_Roller');
   });
+
+  it('asigna correctamente Front_Plate_Raise a Elevaciones frontales de disco y NO press de hombros', () => {
+    const res = findExerciseDetail('15 Elevaciones frontales de disco');
+    expect(res.muscleGroup).toBe('Hombros');
+    expect(res.pattern).toBe('Aislamiento');
+    expect(res.demoImages).toBeDefined();
+    expect(res.demoImages?.[0]).toContain('Front_Plate_Raise');
+    expect(res.demoImages?.[0]).not.toContain('Seated_Dumbbell_Press');
+    expect(res.targetFocus).toContain('Deltoides anterior');
+    expect(res.steps.some(s => /disco|mancuerna|pecho|ojos/i.test(s))).toBe(true);
+  });
+
+  it('ordena adecuadamente las imágenes del Press militar sentado (1.jpg inicio a la altura de hombros, 0.jpg contracción arriba)', () => {
+    const res = findExerciseDetail('Press militar con mancuernas sentado');
+    expect(res.demoImages).toBeDefined();
+    expect(res.demoImages?.[0]).toContain('Seated_Dumbbell_Press/1.jpg');
+    expect(res.demoImages?.[1]).toContain('Seated_Dumbbell_Press/0.jpg');
+  });
+
+  it('identifica correctamente las caminatas de oso (Bear crawls) como Core y no como hombro o pecho', () => {
+    const res = findExerciseDetail('10 Caminatas de oso (Bear crawls)');
+    expect(res.muscleGroup).toBe('Core');
+    expect(res.steps.some(s => /cuadrupedia|rodillas|gateo/i.test(s))).toBe(true);
+  });
+
+  it('asigna imágenes de Russian_Twist a los giros rusos', () => {
+    const res = findExerciseDetail('20 Giros rusos (Russian twists)');
+    expect(res.muscleGroup).toBe('Core');
+    expect(res.demoImages?.[0]).toContain('Russian_Twist');
+  });
 });
+

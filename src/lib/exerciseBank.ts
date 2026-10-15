@@ -1484,7 +1484,7 @@ function findSingleExercise(name: string): ExerciseDetail {
   const isPull = /remo|jalon|jalón|dominada|pull|espalda|dorsal/i.test(cleanName);
   const isShoulders = !isCalves && /hombro|deltoid|militar|elevacion.*(lateral|frontal)|elevación.*(lateral|frontal)|pajaro|pájaro|face pull/i.test(cleanName);
   const isPush = /press.*(banca|plano|inclinado|pecho)|pecho|flexion|flexión|apertura|dips/i.test(cleanName);
-  const isCore = /abdomen|abdominal|core|plancha|plank|crunch|rueda.*ab|rollout|elevacion.*(pierna|rodilla)|elevación.*(pierna|rodilla)|giro.*ruso/i.test(cleanName);
+  const isCore = /abdomen|abdominal|core|plancha|plank|crunch|rueda.*ab|rollout|elevacion.*(pierna|rodilla)|elevación.*(pierna|rodilla)|giro.*ruso|russian|twist|oso|bear|crawl|hollow/i.test(cleanName);
   const isCarry = /carry|carga|bucket|sandbag|paseo|transporte/i.test(cleanName);
   const isRunning = /carrera|correr|run|trote|intervalo|trail|sprint/i.test(cleanName);
 
@@ -1530,25 +1530,47 @@ function findSingleExercise(name: string): ExerciseDetail {
 
   if (isShoulders) {
     const isLateral = /lateral/i.test(cleanName);
-    const media = isLateral ? findExerciseMedia('elevacion lateral') : findExerciseMedia('press militar');
+    const isFrontal = /frontal/i.test(cleanName);
+    const media = isFrontal
+      ? findExerciseMedia('elevacion frontal')
+      : isLateral
+      ? findExerciseMedia('elevacion lateral')
+      : findExerciseMedia('press militar');
+
     return {
       id: `custom_shoulder_${cleanName.replace(/\s+/g, '_')}`,
       name,
       muscleGroup: 'Hombros',
-      pattern: isLateral ? 'Aislamiento' : 'Empuje vertical',
+      pattern: isLateral || isFrontal ? 'Aislamiento' : 'Empuje vertical',
       level: 'A',
-      equipment: equipmentGuess,
-      steps: [
+      equipment: /disco/i.test(cleanName) ? 'Mancuernas' : equipmentGuess,
+      steps: isFrontal ? [
+        'Sujeta la carga (disco o mancuernas) frente a los muslos con los brazos casi extendidos pero codos relajados.',
+        'Mantén el torso erguido y el core firme sin arquear la zona lumbar.',
+        'Eleva la carga hacia adelante y arriba en una trayectoria suave hasta la altura de los ojos o la barbilla.',
+        'Pausa 1 segundo en la cúspide apretando los deltoides frontales y baja en 2 a 3 segundos resistiendo el peso.'
+      ] : isLateral ? [
+        'Inclina el torso levemente hacia adelante (5°-10°) con una mancuerna en cada mano.',
+        'Eleva los brazos hacia los lados en el plano escapular guiando con los codos.',
+        'Sube hasta la altura paralela de los hombros sin balancear el cuerpo.',
+        'Pausa 1 segundo arriba y desciende en 2 segundos controlando el movimiento.'
+      ] : [
         'Alinea el torso con el abdomen firme y los glúteos contraídos para proteger las lumbares.',
         'Sube la carga verticalmente en el plano escapular con una trayectoria fluida.',
         'Desciende de forma pausada hasta la altura de los hombros o clavículas sin soltar el peso.'
       ],
       commonMistakes: [
-        'Arquear la espalda lumbar hacia atrás.',
-        'Acortar el recorrido bajando solo hasta la mitad de la cabeza.'
+        'Balancear el torso o arquear la espalda baja para subir la carga con inercia.',
+        'Encoger los hombros hacia las orejas usando el trapecio.'
       ],
-      breathingTip: 'Inhala antes de iniciar el empuje; exhala con fuerza al presionar sobre la cabeza.',
-      targetFocus: 'Desarrollo de los deltoides y fuerza de empuje vertical.',
+      breathingTip: isFrontal || isLateral
+        ? 'Exhala al elevar la carga; inhala al descenderla de forma controlada.'
+        : 'Inhala antes de iniciar el empuje; exhala con fuerza al presionar sobre la cabeza.',
+      targetFocus: isFrontal
+        ? 'Aislamiento e hipertrofia del deltoides anterior (hombro frontal) y estabilidad escapular.'
+        : isLateral
+        ? 'Aislamiento del deltoides lateral y silueta en V.'
+        : 'Desarrollo de los deltoides y fuerza de empuje vertical.',
       demoImages: media?.demoImages
     };
   }
@@ -1722,12 +1744,16 @@ function findSingleExercise(name: string): ExerciseDetail {
     const isCableCrunch = /polea|cable/i.test(cleanName);
     const isWheel = /rueda|rollout|wheel/i.test(cleanName);
     const isHanging = /elevacion|elevación|colgado|pierna|rodilla/i.test(cleanName);
+    const isRussian = /ruso|russian/i.test(cleanName);
+    const isBear = /oso|bear/i.test(cleanName);
     const media = isCableCrunch
       ? findExerciseMedia('cable crunch')
       : isWheel
       ? findExerciseMedia('rueda abdominal')
       : isHanging
       ? findExerciseMedia('elevacion pierna')
+      : isRussian
+      ? findExerciseMedia('giro ruso')
       : findExerciseMedia('plancha');
 
     return {
@@ -1736,12 +1762,21 @@ function findSingleExercise(name: string): ExerciseDetail {
       muscleGroup: 'Core',
       pattern: 'Aislamiento',
       level: 'A',
-      equipment: isCableCrunch ? 'Polea' : isWheel ? 'Peso corporal' : equipmentGuess,
+      equipment: isCableCrunch ? 'Polea' : (isWheel || isRussian || isBear) ? 'Peso corporal' : equipmentGuess,
       steps: isCableCrunch ? [
         'Arrodíllate frente a la polea alta con el accesorio de cuerda.',
         'Sujeta la cuerda a los lados de la cabeza y mantén los brazos fijos.',
         'Enrolla la columna contrayendo los abdominales llevando los codos a los muslos.',
         'Pausa 1 segundo apretando el abdomen y regresa controlando el movimiento.'
+      ] : isBear ? [
+        'Ponte en posición de cuadrupedia con las manos bajo los hombros y las rodillas bajo las caderas.',
+        'Despega las rodillas del suelo solo 2 a 3 centímetros manteniendo la espalda completamente plana.',
+        'Avanza en pasos cruzados cortos coordinando mano derecha con pie izquierdo y viceversa.',
+        'Mantén las caderas estables sin balancear el torso de lado a lado.'
+      ] : isRussian ? [
+        'Siéntate con las rodillas flexionadas y reclina el torso hacia atrás a 45° con la espalda recta.',
+        'Gira el torso de un lado al otro llevando las manos hacia la cadera opuesta con control.',
+        'Siente la contracción oblicua en cada lado sin redondear los hombros.'
       ] : [
         'Adopta una postura estable activando la pared abdominal y los glúteos.',
         'Ejecuta el movimiento con control muscular estricto evitando tirar con el cuello o la zona lumbar.',
@@ -1751,8 +1786,12 @@ function findSingleExercise(name: string): ExerciseDetail {
         'Tirar con el cuello o los brazos en vez de usar la contracción del abdomen.',
         'Arquear la espalda lumbar perdiendo la estabilidad del core.'
       ],
-      breathingTip: 'Exhala en la contracción abdominal; inhala al extender con control.',
-      targetFocus: 'Fuerza funcional, estabilidad central y definición del recto abdominal.',
+      breathingTip: 'Exhala en la contracción abdominal o en cada rotación; inhala al extender o transicionar.',
+      targetFocus: isBear
+        ? 'Estabilidad anti-rotación y fuerza isométrica del core en cuadrupedia.'
+        : isRussian
+        ? 'Fuerza rotacional y definición de los oblicuos y pared abdominal.'
+        : 'Fuerza funcional, estabilidad central y definición del recto abdominal.',
       demoImages: media?.demoImages
     };
   }

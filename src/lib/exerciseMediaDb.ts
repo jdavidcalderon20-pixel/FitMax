@@ -389,8 +389,35 @@ export const EXERCISE_MEDIA_DATABASE: ExerciseMediaEntry[] = [
     breathingTip: 'Inhala antes de iniciar; exhala con fuerza al empujar sobre la cabeza.',
     targetFocus: 'Desarrollo de fuerza vertical y redondez del hombro.',
     demoImages: [
-      `${CDN_BASE}/Seated_Dumbbell_Press/0.jpg`,
-      `${CDN_BASE}/Seated_Dumbbell_Press/1.jpg`
+      `${CDN_BASE}/Seated_Dumbbell_Press/1.jpg`,
+      `${CDN_BASE}/Seated_Dumbbell_Press/0.jpg`
+    ]
+  },
+  {
+    id: 'front_plate_raise',
+    matchPatterns: [/elevacion.*frontal/i, /elevación.*frontal/i, /front.*raise/i, /disco.*frontal/i, /frontal.*disco/i],
+    canonicalName: 'Elevaciones frontales con disco o mancuerna',
+    muscleGroup: 'Hombros',
+    pattern: 'Aislamiento',
+    equipment: 'Mancuernas',
+    primaryMuscle: 'Deltoides anterior (Porción clavicular)',
+    secondaryMuscles: ['Deltoides lateral', 'Serrato anterior', 'Pectoral superior'],
+    steps: [
+      'Párate erguido sujetando un disco con ambas manos frente a tus muslos, con los brazos casi extendidos pero codos relajados.',
+      'Mantén el abdomen firme y la pelvis neutra para evitar balanceos con la espalda.',
+      'Eleva el disco hacia adelante y arriba de forma controlada hasta la altura de los ojos o la barbilla.',
+      'Pausa 1 segundo arriba apretando los deltoides frontales y desciende en 2 a 3 segundos resistiendo el peso.'
+    ],
+    commonMistakes: [
+      'Balancear el torso o arquear la zona lumbar para subir el peso con impulso.',
+      'Encoger los hombros hacia las orejas usando los trapecios.',
+      'Dejar caer el disco sin frenar la bajada.'
+    ],
+    breathingTip: 'Exhala al elevar el disco hacia el frente; inhala al descenderlo controlado a los muslos.',
+    targetFocus: 'Aislamiento e hipertrofia del deltoides anterior (hombro frontal) y estabilidad escapular.',
+    demoImages: [
+      `${CDN_BASE}/Front_Plate_Raise/0.jpg`,
+      `${CDN_BASE}/Front_Plate_Raise/1.jpg`
     ]
   },
   {
@@ -1044,8 +1071,34 @@ export const EXERCISE_MEDIA_DATABASE: ExerciseMediaEntry[] = [
     ]
   },
   {
+    id: 'russian_twist',
+    matchPatterns: [/giro.*ruso/i, /russian.*twist/i, /giros.*rusos/i],
+    canonicalName: 'Giros rusos (Russian twists)',
+    muscleGroup: 'Core',
+    pattern: 'Aislamiento',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Oblicuos internos y externos',
+    secondaryMuscles: ['Recto anterior del abdomen', 'Transverso abdominal'],
+    steps: [
+      'Siéntate en el suelo con las rodillas flexionadas y reclina el torso hacia atrás unos 45° manteniendo la espalda recta.',
+      'Eleva los pies ligeramente del suelo para mayor activación o déjalos apoyados si eres principiante.',
+      'Gira el torso de un lado al otro llevando las manos hacia la cadera opuesta en un movimiento controlado.',
+      'Siente la torsión controlada desde el core en cada rotación sin redondear los hombros.'
+    ],
+    commonMistakes: [
+      'Mover solo los brazos sin rotar realmente el torso.',
+      'Encorvar la zona lumbar perdiendo la tensión del abdomen.'
+    ],
+    breathingTip: 'Exhala en cada giro lateral; inhala en la transición central.',
+    targetFocus: 'Fuerza rotacional y definición de los oblicuos y pared abdominal.',
+    demoImages: [
+      `${CDN_BASE}/Russian_Twist/0.jpg`,
+      `${CDN_BASE}/Russian_Twist/1.jpg`
+    ]
+  },
+  {
     id: 'plank_core',
-    matchPatterns: [/plancha/i, /plank/i, /core/i],
+    matchPatterns: [/plancha/i, /plank/i],
     canonicalName: 'Plancha abdominal isométrica',
     muscleGroup: 'Core',
     pattern: 'Aislamiento',

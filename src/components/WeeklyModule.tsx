@@ -31,6 +31,7 @@ import {
   WeeklyExercise, 
   generateWeeklyRoutine, 
   getAlternativeWeeklyExercises,
+  getDefaultAbsAmrap,
   RoutineFocus
 } from '../lib/weeklyGenerator';
 import { 
@@ -142,7 +143,7 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
   const [showFinishedAlert, setShowFinishedAlert] = useState<boolean>(false);
 
   // Estados del AMRAP
-  const [amrapType, setAmrapType] = useState<'complementary' | 'activator'>('complementary');
+  const [amrapType, setAmrapType] = useState<'complementary' | 'activator' | 'abs'>('complementary');
   const [amrapCustomDuration, setAmrapCustomDuration] = useState<number>(selectedLevel === 'A' ? 5 : selectedLevel === 'C' ? 10 : 7);
   const [amrapTimeLeft, setAmrapTimeLeft] = useState<number>((selectedLevel === 'A' ? 5 : selectedLevel === 'C' ? 10 : 7) * 60);
   const [amrapRunning, setAmrapRunning] = useState<boolean>(false);
@@ -1088,161 +1089,175 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
         })}
       </div>
 
-      {/* AMRAP COMPLEMENTARIO / ACTIVADOR PLEGABLE */}
-      <div className="mt-5 bg-[#20252C] rounded-3xl border border-[#282F38] shadow-xl overflow-hidden">
-        <button
-          onClick={() => setAmrapOpen(!amrapOpen)}
-          className="w-full p-4 flex items-center justify-between text-left hover:bg-[#282F38]/50 transition-colors cursor-pointer"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
-              <Trophy className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-black text-white">Finisher metabólico (AMRAP opcional)</span>
-                <span className="text-[10px] font-bold text-purple-300 bg-purple-950/80 px-2 py-0.5 rounded-full border border-purple-800/40">
-                  {amrapCustomDuration} min
-                </span>
+      {/* AMRAP COMPLEMENTARIO / ACTIVADOR / ABDOMEN PLEGABLE */}
+      {(() => {
+        const activeAmrap = 
+          amrapType === 'complementary'
+            ? currentDay.amrapComplementary
+            : amrapType === 'activator'
+            ? currentDay.amrapActivator
+            : (currentDay.amrapAbs || getDefaultAbsAmrap(currentDay.id));
+
+        return (
+          <div className="mt-5 bg-[#20252C] rounded-3xl border border-[#282F38] shadow-xl overflow-hidden">
+            <button
+              onClick={() => setAmrapOpen(!amrapOpen)}
+              className="w-full p-4 flex items-center justify-between text-left hover:bg-[#282F38]/50 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-purple-500/15 text-purple-400 flex items-center justify-center shrink-0">
+                  <Trophy className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-white">Finisher metabólico (AMRAP opcional)</span>
+                    <span className="text-[10px] font-bold text-purple-300 bg-purple-950/80 px-2 py-0.5 rounded-full border border-purple-800/40">
+                      {amrapCustomDuration} min
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#A8B0BB] mt-0.5">
+                    {activeAmrap.name}
+                  </p>
+                </div>
               </div>
-              <p className="text-[11px] text-[#A8B0BB] mt-0.5">
-                {amrapType === 'complementary' ? currentDay.amrapComplementary.name : currentDay.amrapActivator.name}
-              </p>
-            </div>
-          </div>
-          <ChevronRight className={`w-4 h-4 text-[#A8B0BB] transition-transform duration-200 ${amrapOpen ? 'rotate-90' : ''}`} />
-        </button>
+              <ChevronRight className={`w-4 h-4 text-[#A8B0BB] transition-transform duration-200 ${amrapOpen ? 'rotate-90' : ''}`} />
+            </button>
 
-        {amrapOpen && (
-          <div className="p-5 pt-2 border-t border-[#282F38] space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <p className="text-xs text-[#A8B0BB]">
-                  {amrapType === 'complementary'
-                    ? currentDay.amrapComplementary.instructions
-                    : currentDay.amrapActivator.instructions}
-                </p>
+            {amrapOpen && (
+              <div className="p-5 pt-2 border-t border-[#282F38] space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs text-[#A8B0BB]">
+                      {activeAmrap.instructions}
+                    </p>
 
-                {/* Selector de Duración 5, 7, 10 min */}
-                <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
-                  <span className="text-[11px] font-bold text-[#A8B0BB]">Duración:</span>
-                  {[5, 7, 10].map((mins) => {
-                    const isSuggested = (mins === 5 && selectedLevel === 'A') || (mins === 7 && selectedLevel === 'B') || (mins === 10 && selectedLevel === 'C');
-                    return (
+                    {/* Selector de Duración 5, 7, 10 min */}
+                    <div className="flex items-center gap-1.5 mt-2.5 flex-wrap">
+                      <span className="text-[11px] font-bold text-[#A8B0BB]">Duración:</span>
+                      {[5, 7, 10].map((mins) => {
+                        const isSuggested = (mins === 5 && selectedLevel === 'A') || (mins === 7 && selectedLevel === 'B') || (mins === 10 && selectedLevel === 'C');
+                        return (
+                          <button
+                            key={mins}
+                            onClick={() => {
+                              setAmrapCustomDuration(mins);
+                              setAmrapTimeLeft(mins * 60);
+                              setAmrapRunning(false);
+                              setShowAmrapAlert(false);
+                            }}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                              amrapCustomDuration === mins
+                                ? 'bg-purple-600 border-purple-500 text-white shadow'
+                                : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white'
+                            }`}
+                          >
+                            {mins} min {isSuggested ? '(Sugerido)' : ''}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 bg-[#15181D] p-1 rounded-xl border border-[#282F38] shrink-0 self-start sm:self-auto flex-wrap">
+                    <button
+                      onClick={() => setAmrapType('complementary')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        amrapType === 'complementary' ? 'bg-purple-600 text-white shadow' : 'text-[#A8B0BB] hover:text-white'
+                      }`}
+                    >
+                      Complementario
+                    </button>
+                    <button
+                      onClick={() => setAmrapType('activator')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        amrapType === 'activator' ? 'bg-purple-600 text-white shadow' : 'text-[#A8B0BB] hover:text-white'
+                      }`}
+                    >
+                      Activador
+                    </button>
+                    <button
+                      onClick={() => setAmrapType('abs')}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        amrapType === 'abs' ? 'bg-purple-600 text-white shadow' : 'text-[#A8B0BB] hover:text-white'
+                      }`}
+                    >
+                      Abdomen
+                    </button>
+                  </div>
+                </div>
+
+                {/* Ejercicios del AMRAP y Cronómetro */}
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="flex-1 space-y-1.5 w-full">
+                    {activeAmrap.exercises.map((ex, i) => (
+                      <div 
+                        key={i} 
+                        onClick={() => setInspectedExercise(findExerciseDetail(ex))}
+                        className="flex items-center justify-between text-xs text-[#F4F2ED] bg-[#15181D] hover:bg-[#282F38] hover:border-purple-500/50 px-3 py-2 rounded-xl border border-[#282F38] cursor-pointer transition-colors group"
+                        title="Toca para ver técnica de este ejercicio"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black flex items-center justify-center shrink-0">
+                            {i + 1}
+                          </span>
+                          <span className="group-hover:text-purple-300 transition-colors font-medium">{ex}</span>
+                        </div>
+                        <Info className="w-3 h-3 text-[#A8B0BB] group-hover:text-purple-400 shrink-0" />
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Temporizador AMRAP */}
+                  <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-4 flex flex-col items-center justify-center shrink-0 w-full md:w-56">
+                    <div className="text-3xl font-extrabold font-mono tracking-tight text-purple-400 tabular-nums mb-2">
+                      {formatTime(amrapTimeLeft)}
+                    </div>
+                    <div className="flex items-center gap-2 w-full">
                       <button
-                        key={mins}
-                        onClick={() => {
-                          setAmrapCustomDuration(mins);
-                          setAmrapTimeLeft(mins * 60);
-                          setAmrapRunning(false);
-                          setShowAmrapAlert(false);
-                        }}
-                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                          amrapCustomDuration === mins
-                            ? 'bg-purple-600 border-purple-500 text-white shadow'
-                            : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white'
+                        onClick={() => setAmrapRunning(!amrapRunning)}
+                        className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          amrapRunning ? 'bg-[#282F38] text-white hover:bg-[#323B47]' : 'bg-purple-600 text-white hover:bg-purple-500'
                         }`}
                       >
-                        {mins} min {isSuggested ? `(Nivel ${selectedLevel})` : ''}
+                        {amrapRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+                        <span>{amrapRunning ? 'Pausar' : 'Empezar'}</span>
                       </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1 bg-[#15181D] p-1 rounded-xl border border-[#282F38] shrink-0 self-start sm:self-auto">
-                <button
-                  onClick={() => setAmrapType('complementary')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    amrapType === 'complementary' ? 'bg-purple-600 text-white' : 'text-[#A8B0BB] hover:text-white'
-                  }`}
-                >
-                  Complementario
-                </button>
-                <button
-                  onClick={() => setAmrapType('activator')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                    amrapType === 'activator' ? 'bg-purple-600 text-white' : 'text-[#A8B0BB] hover:text-white'
-                  }`}
-                >
-                  Activador
-                </button>
-              </div>
-            </div>
-
-            {/* Ejercicios del AMRAP y Cronómetro */}
-            <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-              <div className="flex-1 space-y-1.5 w-full">
-                {(amrapType === 'complementary'
-                  ? currentDay.amrapComplementary.exercises
-                  : currentDay.amrapActivator.exercises
-                ).map((ex, i) => (
-                  <div 
-                    key={i} 
-                    onClick={() => setInspectedExercise(findExerciseDetail(ex))}
-                    className="flex items-center justify-between text-xs text-[#F4F2ED] bg-[#15181D] hover:bg-[#282F38] hover:border-purple-500/50 px-3 py-2 rounded-xl border border-[#282F38] cursor-pointer transition-colors group"
-                    title="Toca para ver técnica de este ejercicio"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black flex items-center justify-center shrink-0">
-                        {i + 1}
-                      </span>
-                      <span className="group-hover:text-purple-300 transition-colors font-medium">{ex}</span>
+                      <button
+                        onClick={() => {
+                          setAmrapRunning(false);
+                          setAmrapTimeLeft(amrapCustomDuration * 60);
+                          setShowAmrapAlert(false);
+                        }}
+                        className="bg-[#282F38] hover:bg-[#323B47] text-[#A8B0BB] hover:text-white font-bold px-3 py-2 rounded-xl text-xs cursor-pointer"
+                      >
+                        Reiniciar
+                      </button>
                     </div>
-                    <Info className="w-3 h-3 text-[#A8B0BB] group-hover:text-purple-400 shrink-0" />
-                  </div>
-                ))}
-              </div>
-
-              {/* Temporizador AMRAP */}
-              <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-4 flex flex-col items-center justify-center shrink-0 w-full md:w-56">
-                <div className="text-3xl font-extrabold font-mono tracking-tight text-purple-400 tabular-nums mb-2">
-                  {formatTime(amrapTimeLeft)}
-                </div>
-                <div className="flex items-center gap-2 w-full">
-                  <button
-                    onClick={() => setAmrapRunning(!amrapRunning)}
-                    className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
-                      amrapRunning ? 'bg-[#282F38] text-white hover:bg-[#323B47]' : 'bg-purple-600 text-white hover:bg-purple-500'
-                    }`}
-                  >
-                    {amrapRunning ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                    <span>{amrapRunning ? 'Pausar' : 'Empezar'}</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAmrapRunning(false);
-                      setAmrapTimeLeft(amrapCustomDuration * 60);
-                      setShowAmrapAlert(false);
-                    }}
-                    className="bg-[#282F38] hover:bg-[#323B47] text-[#A8B0BB] hover:text-white font-bold px-3 py-2 rounded-xl text-xs cursor-pointer"
-                  >
-                    Reiniciar
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {showAmrapAlert && (
-              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl p-3.5 shadow-lg flex items-center justify-between border border-purple-400/50">
-                <div className="flex items-center gap-2">
-                  <Trophy className="w-5 h-5 text-amber-300 animate-bounce" />
-                  <div>
-                    <p className="text-xs font-black">¡AMRAP completado!</p>
-                    <p className="text-[11px] opacity-90">Gran esfuerzo para cerrar la sesión de hoy.</p>
                   </div>
                 </div>
-                <button
-                  onClick={() => setShowAmrapAlert(false)}
-                  className="bg-white text-zinc-950 text-xs font-black px-3 py-1 rounded-lg cursor-pointer"
-                >
-                  Genial
-                </button>
+
+                {showAmrapAlert && (
+                  <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl p-3.5 shadow-lg flex items-center justify-between border border-purple-400/50">
+                    <div className="flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-amber-300 animate-bounce" />
+                      <div>
+                        <p className="text-xs font-black">¡AMRAP completado!</p>
+                        <p className="text-[11px] opacity-90">Gran esfuerzo para cerrar la sesión de hoy.</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowAmrapAlert(false)}
+                      className="bg-white text-zinc-950 text-xs font-black px-3 py-1 rounded-lg cursor-pointer"
+                    >
+                      Genial
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
-        )}
-      </div>
+        );
+      })()}
 
       {/* ACCIONES SECUNDARIAS AL FONDO */}
       <div className="mt-6 pt-4 border-t border-[#282F38] flex flex-col sm:flex-row gap-3">

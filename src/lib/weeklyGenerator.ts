@@ -10,25 +10,71 @@ export interface WeeklyExercise {
 
 export type RoutineFocus = 'standard' | 'glutes';
 
+export interface AmrapBlock {
+  name: string;
+  durationMinutes: number;
+  exercises: string[];
+  instructions: string;
+}
+
 export interface WeeklyDay {
   id: number;
   name: string;
   subtitle: string;
   category: 'torso_fuerza' | 'pierna_fuerza' | 'torso_hipertrofia' | 'pierna_hipertrofia' | 'gluteos_fuerza' | 'torso_estetico' | 'gluteos_hipertrofia' | 'espalda_gluteos' | 'pierna_gluteos_hipertrofia' | 'gluteos_bombeo' | string;
   exercises: WeeklyExercise[];
-  amrapComplementary: {
-    name: string;
-    durationMinutes: number;
-    exercises: string[];
-    instructions: string;
-  };
-  amrapActivator: {
-    name: string;
-    durationMinutes: number;
-    exercises: string[];
-    instructions: string;
-  };
+  amrapComplementary: AmrapBlock;
+  amrapActivator: AmrapBlock;
+  amrapAbs?: AmrapBlock;
 }
+
+export const DEFAULT_ABS_AMRAP_POOLS: AmrapBlock[] = [
+  {
+    name: 'AMRAP Abdomen: Quemador de Recto y Oblicuos',
+    durationMinutes: 7,
+    exercises: [
+      '15 Abdominales en polea alta (Cable crunches)',
+      '12 Elevaciones de piernas en suelo o paralelas',
+      '30s Plancha abdominal isométrica'
+    ],
+    instructions: 'Realiza tantas rondas continuas como puedas. Enfócate en flexionar la columna contrayendo el abdomen, sin tirar del cuello ni arquear las lumbares.'
+  },
+  {
+    name: 'AMRAP Abdomen: Core de Hierro y Estabilidad',
+    durationMinutes: 7,
+    exercises: [
+      '20 Giros rusos (Russian twists)',
+      '12 Tijeras abdominales en colchoneta',
+      '10 Planchas altas con toque de hombros'
+    ],
+    instructions: 'Mantén la pelvis neutra y el core en máxima tensión isométrica durante todo el tiempo sin balancear las caderas.'
+  },
+  {
+    name: 'AMRAP Abdomen: Definición de Abdomen Inferior',
+    durationMinutes: 7,
+    exercises: [
+      '12 Elevaciones de rodillas o piernas colgado',
+      '15 Crunches en colchoneta controlados',
+      '30s Plancha lateral (15s por lado)'
+    ],
+    instructions: 'Bascula la pelvis hacia arriba en cada repetición para aislar el abdomen bajo. Prioriza la cadencia lenta y la contracción en el pico.'
+  },
+  {
+    name: 'AMRAP Abdomen: Circuito Metabólico y Anti-extensión',
+    durationMinutes: 7,
+    exercises: [
+      '10 Caminatas de oso (Bear crawls)',
+      '15 Crunches bicicleta continuos',
+      '30s Plancha hueca (Hollow body hold)'
+    ],
+    instructions: 'Activa el transverso abdominal y mantén la espalda baja plana contra el suelo o la pared abdominal blindada en todo momento.'
+  }
+];
+
+export const getDefaultAbsAmrap = (dayId: number = 1): AmrapBlock => {
+  const index = Math.abs((dayId - 1) % DEFAULT_ABS_AMRAP_POOLS.length);
+  return DEFAULT_ABS_AMRAP_POOLS[index];
+};
 
 export type WeeklyRoutine = Record<number, WeeklyDay>;
 
@@ -1049,7 +1095,8 @@ export const generateWeeklyRoutine = (
           durationMinutes: 5,
           exercises: ['10 Puentes de glúteo dinámicos', '8 Rotaciones 90/90 de cadera', '12 Patadas de hidrante (Fire hydrants)'],
           instructions: 'Despierta el glúteo medio y mayor antes de iniciar las series pesadas.'
-        }
+        },
+        amrapAbs: getDefaultAbsAmrap(1)
       },
       2: {
         id: 2,
@@ -1104,7 +1151,8 @@ export const generateWeeklyRoutine = (
           durationMinutes: 5,
           exercises: ['12 Flexiones escapulares', '8 Rotaciones torácicas en cuadrupedia', '10 Estiramientos de pecho dinámicos'],
           instructions: 'Prepara las articulaciones glenohumerales para los empujes y tracciones.'
-        }
+        },
+        amrapAbs: getDefaultAbsAmrap(2)
       },
       3: {
         id: 3,
@@ -1159,7 +1207,8 @@ export const generateWeeklyRoutine = (
           durationMinutes: 5,
           exercises: ['8 Desplantes de cosaco laterales', '10 Sentadillas profundas sostenidas', '12 Elevaciones pélvicas en suelo'],
           instructions: 'Aumenta la dorsiflexión de tobillo para sentadillas profundas sin despegar talones.'
-        }
+        },
+        amrapAbs: getDefaultAbsAmrap(3)
       },
       4: {
         id: 4,
@@ -1214,7 +1263,8 @@ export const generateWeeklyRoutine = (
           durationMinutes: 5,
           exercises: ['8 Respiraciones gato-camello', '10 Estiramientos de psoas ilíaco', '5 Estiramientos en posición de paloma'],
           instructions: 'Descomprime la columna y relaja flexores de cadera tras la semana de sobrecarga.'
-        }
+        },
+        amrapAbs: getDefaultAbsAmrap(4)
       }
     };
 
@@ -1278,7 +1328,8 @@ export const generateWeeklyRoutine = (
           durationMinutes: 5,
           exercises: ['8 Rotaciones de cadera 90/90', '10 Gato-camello respiraciones lentas', '8 Desplantes de cosaco'],
           instructions: 'Relajación miofascial y movilidad activa de cadera previa al descanso del fin de semana.'
-        }
+        },
+        amrapAbs: getDefaultAbsAmrap(5)
       };
     }
 
@@ -1361,7 +1412,8 @@ export const generateWeeklyRoutine = (
           durationMinutes: 5,
           exercises: am1_act.exercises,
           instructions: am1_act.instructions
-        }
+        },
+        amrapAbs: getDefaultAbsAmrap(1)
       },
       2: {
         id: 2,
@@ -1386,7 +1438,8 @@ export const generateWeeklyRoutine = (
           durationMinutes: 5,
           exercises: ['10 Rotaciones de columna torácica', '8 Inchworms dinámicos', '10 Sentadillas profundas'],
           instructions: 'Preparación neuromuscular y apertura articular.'
-        }
+        },
+        amrapAbs: getDefaultAbsAmrap(2)
       },
       3: {
         id: 3,
@@ -1411,7 +1464,8 @@ export const generateWeeklyRoutine = (
           durationMinutes: 5,
           exercises: ['8 Estiramientos de isquios en paso dinámico', '10 Gato-camello respiraciones', '6 Desplantes de cosaco'],
           instructions: 'Aumenta el rango de movimiento de caderas e isquios.'
-        }
+        },
+        amrapAbs: getDefaultAbsAmrap(3)
       }
     };
   }
@@ -1470,7 +1524,8 @@ export const generateWeeklyRoutine = (
         durationMinutes: 5,
         exercises: am1_act.exercises,
         instructions: am1_act.instructions
-      }
+      },
+      amrapAbs: getDefaultAbsAmrap(1)
     },
     2: {
       id: 2,
@@ -1525,7 +1580,8 @@ export const generateWeeklyRoutine = (
         durationMinutes: 5,
         exercises: ['12 Flexiones escapulares', '8 Rotaciones torácicas en cuadrupedia', '10 Planchas altas a perro boca abajo'],
         instructions: 'Mejora la movilidad de hombros, columna torácica y prepara los empujes para el día de torso.'
-      }
+      },
+      amrapAbs: getDefaultAbsAmrap(2)
     },
     3: {
       id: 3,
@@ -1580,7 +1636,8 @@ export const generateWeeklyRoutine = (
         durationMinutes: 5,
         exercises: ['8 Desplantes de cosaco laterales', '10 Estiramientos de tobillo contra pared', '12 Patadas de glúteo en cuadrupedia'],
         instructions: 'Aumenta el rango de movimiento de las caderas y flexión de tobillo para sentadillas profundas mañana.'
-      }
+      },
+      amrapAbs: getDefaultAbsAmrap(3)
     },
     4: {
       id: 4,
@@ -1635,7 +1692,8 @@ export const generateWeeklyRoutine = (
         durationMinutes: 5,
         exercises: ['8 Saludos al sol de yoga lentos', '10 Gato-camello respiraciones', '5 Sentadillas profundas con estiramiento'],
         instructions: 'Sesión de relajación e incremento de rango articular posterior a la alta exigencia del entrenamiento.'
-      }
+      },
+      amrapAbs: getDefaultAbsAmrap(4)
     }
   };
 
@@ -1699,7 +1757,8 @@ export const generateWeeklyRoutine = (
         durationMinutes: 5,
         exercises: ['8 Respiraciones en posición del niño (Child pose)', '10 Rotaciones de columna torácica', '6 Estiramientos de psoas'],
         instructions: 'Restauración del sistema nervioso y flexibilidad pasivo-activa post-entreno.'
-      }
+      },
+      amrapAbs: getDefaultAbsAmrap(5)
     };
   }
 
