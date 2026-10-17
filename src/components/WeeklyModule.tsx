@@ -22,18 +22,26 @@ import {
   Info,
   Sliders,
   MoreHorizontal,
-  Check
+  Check,
+  Search
 } from 'lucide-react';
 import WorkoutSessionView from './WorkoutSessionView';
 import { Level } from '../types';
 import { 
   WeeklyRoutine, 
+  WeeklyDay,
   WeeklyExercise, 
+  AmrapBlock,
   generateWeeklyRoutine, 
   getAlternativeWeeklyExercises,
   getDefaultAbsAmrap,
   RoutineFocus
 } from '../lib/weeklyGenerator';
+import { 
+  getFinisherAlternatives, 
+  FinisherExerciseOption, 
+  FinisherEquipmentGroup 
+} from '../lib/finisherBank';
 import { 
   HistoryEntry, 
   pushHistoryEntry, 
@@ -81,8 +89,18 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
     return 'standard';
   });
 
-  // Estado para sustituir ejercicio individual
+  // Estado para sustituir ejercicio individual de la rutina
   const [swapModalState, setSwapModalState] = useState<{ dayId: number; exIndex: number; currentName: string } | null>(null);
+
+  // Estado para sustituir ejercicio individual del Finisher (AMRAP)
+  const [swapAmrapModalState, setSwapAmrapModalState] = useState<{
+    dayId: number;
+    amrapType: 'complementary' | 'activator' | 'abs';
+    exIndex: number;
+    currentName: string;
+  } | null>(null);
+  const [finisherEquipmentFilter, setFinisherEquipmentFilter] = useState<FinisherEquipmentGroup>('all');
+  const [finisherSearchQuery, setFinisherSearchQuery] = useState<string>('');
 
   // Estados de Sesión Activa (Imagen 1) y Modal Editar Plan
   const [activeSessionDay, setActiveSessionDay] = useState<number | null>(null);
@@ -698,6 +716,53 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
     }
   };
 
+  // Sustituir un ejercicio del Finisher (AMRAP) por una alternativa del banco
+  const handleSwapAmrapExercise = (newExName: string) => {
+    if (!swapAmrapModalState || !weeklyRoutine) return;
+    const { dayId, amrapType: targetType, exIndex } = swapAmrapModalState;
+    const day = weeklyRoutine[dayId];
+    if (!day) return;
+
+    let targetBlock: AmrapBlock;
+    if (targetType === 'abs') {
+      targetBlock = { ...(day.amrapAbs || getDefaultAbsAmrap(dayId)) };
+    } else if (targetType === 'activator') {
+      targetBlock = { ...day.amrapActivator };
+    } else {
+      targetBlock = { ...day.amrapComplementary };
+    }
+
+    const updatedExercises = [...targetBlock.exercises];
+    updatedExercises[exIndex] = newExName;
+    targetBlock.exercises = updatedExercises;
+
+    const updatedDay: WeeklyDay = {
+      ...day,
+      ...(targetType === 'abs' ? { amrapAbs: targetBlock } : {}),
+      ...(targetType === 'activator' ? { amrapActivator: targetBlock } : {}),
+      ...(targetType === 'complementary' ? { amrapComplementary: targetBlock } : {})
+    };
+
+    const updatedRoutine: WeeklyRoutine = {
+      ...weeklyRoutine,
+      [dayId]: updatedDay
+    };
+
+    setWeeklyRoutine(updatedRoutine);
+    try {
+      localStorage.setItem(`fit_gen_${nickname}_weekly_routine_${selectedLevel}_v1`, JSON.stringify(updatedRoutine));
+    } catch (e) {}
+
+    if (user) {
+      updateUserProfileCloud(user.id, { weekly_routine: updatedRoutine });
+    }
+
+    setSwapAmrapModalState(null);
+    if (onNotification) {
+      onNotification(`Finisher actualizado con: ${newExName}`);
+    }
+  };
+
   if (!weeklyRoutine || !weeklyRoutine[activeWeeklyDay]) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 p-8">
@@ -1192,17 +1257,54 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
                     {activeAmrap.exercises.map((ex, i) => (
                       <div 
                         key={i} 
-                        onClick={() => setInspectedExercise(findExerciseDetail(ex))}
-                        className="flex items-center justify-between text-xs text-[#F4F2ED] bg-[#15181D] hover:bg-[#282F38] hover:border-purple-500/50 px-3 py-2 rounded-xl border border-[#282F38] cursor-pointer transition-colors group"
-                        title="Toca para ver técnica de este ejercicio"
+                        className="flex items-center justify-between text-xs text-[#F4F2ED] bg-[#15181D] hover:bg-[#282F38]/80 hover:border-purple-500/40 p-2.5 rounded-xl border border-[#282F38] transition-all group gap-2"
                       >
-                        <div className="flex items-center gap-2">
-                          <span className="w-4 h-4 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black flex items-center justify-center shrink-0">
+                        <div 
+                          onClick={() => setInspectedExercise(findExerciseDetail(ex))}
+                          className="flex items-center gap-2.5 flex-1 min-w-0 cursor-pointer"
+                          title="Toca para ver técnica de este ejercicio"
+                        >
+                          <span className="w-5 h-5 rounded-full bg-purple-500/20 text-purple-300 text-[10px] font-black flex items-center justify-center shrink-0">
                             {i + 1}
                           </span>
-                          <span className="group-hover:text-purple-300 transition-colors font-medium">{ex}</span>
+                          <span className="group-hover:text-purple-300 transition-colors font-medium truncate sm:whitespace-normal">
+                            {ex}
+                          </span>
                         </div>
-                        <Info className="w-3 h-3 text-[#A8B0BB] group-hover:text-purple-400 shrink-0" />
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFinisherEquipmentFilter('all');
+                              setFinisherSearchQuery('');
+                              setSwapAmrapModalState({
+                                dayId: activeWeeklyDay,
+                                amrapType,
+                                exIndex: i,
+                                currentName: ex
+                              });
+                            }}
+                            className="px-2 py-1 bg-[#20252C] hover:bg-[#282F38] text-[#A8B0BB] hover:text-[#5B8DEF] rounded-lg text-[11px] font-bold transition-colors border border-[#282F38] flex items-center gap-1 cursor-pointer"
+                            title="Cambiar por otro ejercicio alternativo del finisher"
+                          >
+                            <RefreshCw className="w-3 h-3 text-[#5B8DEF]" />
+                            <span className="hidden sm:inline">Cambiar</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setInspectedExercise(findExerciseDetail(ex));
+                            }}
+                            className="p-1 bg-[#20252C] hover:bg-[#282F38] text-[#A8B0BB] hover:text-purple-300 rounded-lg transition-colors border border-[#282F38] cursor-pointer"
+                            title="Ver técnica detallada"
+                          >
+                            <Info className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -1492,6 +1594,168 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
                 className="px-4 py-2 bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] hover:text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
               >
                 Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA SUSTITUIR UN EJERCICIO DEL FINISHER (AMRAP) */}
+      {swapAmrapModalState && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#20252C] rounded-3xl p-5 sm:p-6 max-w-lg w-full border border-[#282F38] shadow-2xl text-[#F4F2ED] max-h-[90vh] flex flex-col">
+            {/* Cabecera */}
+            <div className="flex items-center justify-between border-b border-[#282F38] pb-3 mb-3.5 shrink-0">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-purple-400 bg-purple-500/15 border border-purple-500/30 px-2.5 py-0.5 rounded-full">
+                  Finisher · {swapAmrapModalState.amrapType === 'abs' ? 'AMRAP Abdomen' : swapAmrapModalState.amrapType === 'activator' ? 'AMRAP Activador' : 'AMRAP Complementario'}
+                </span>
+                <h3 className="text-base font-black text-white mt-1.5">
+                  Elegir alternativa para este finisher
+                </h3>
+                <p className="text-xs text-[#A8B0BB]">
+                  Actual: <span className="font-bold text-white">{swapAmrapModalState.currentName}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => setSwapAmrapModalState(null)}
+                className="p-1.5 hover:bg-[#15181D] rounded-xl text-[#A8B0BB] hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Aviso de gimnasio concurrido */}
+            <div className="bg-[#15181D] border border-amber-500/25 rounded-2xl p-3 mb-3 text-xs text-amber-200/90 flex items-start gap-2.5 shrink-0">
+              <span className="text-base shrink-0">💡</span>
+              <p className="leading-snug">
+                <strong>¿Poleas o máquinas ocupadas en el gym?</strong> Elige una opción de <em>Sin equipo / Suelo</em> o <em>Mancuerna/Disco</em> para continuar tu AMRAP sin esperas ni pausas.
+              </p>
+            </div>
+
+            {/* Filtros rápidos de equipamiento */}
+            <div className="flex items-center gap-1.5 mb-3 overflow-x-auto pb-1 shrink-0 scrollbar-none">
+              {(
+                [
+                  { id: 'all', label: 'Todos' },
+                  { id: 'bodyweight', label: 'Sin equipo / Suelo' },
+                  { id: 'free_weight', label: 'Mancuerna / Disco' },
+                  { id: 'cable_machine', label: 'Poleas / Máquinas' },
+                  { id: 'bar', label: 'Barras / Paralelas' }
+                ] as const
+              ).map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setFinisherEquipmentFilter(f.id)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border cursor-pointer ${
+                    finisherEquipmentFilter === f.id
+                      ? 'bg-purple-600 border-purple-500 text-white shadow'
+                      : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white hover:border-[#3A434F]'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Buscador de ejercicio */}
+            <div className="relative mb-3 shrink-0">
+              <Search className="w-3.5 h-3.5 text-[#717885] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={finisherSearchQuery}
+                onChange={(e) => setFinisherSearchQuery(e.target.value)}
+                placeholder="Buscar ejercicio (ej. crunch, plancha, elevación)..."
+                className="w-full bg-[#15181D] border border-[#282F38] rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-[#717885] focus:outline-none focus:border-purple-500 transition-colors"
+              />
+              {finisherSearchQuery && (
+                <button
+                  onClick={() => setFinisherSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#A8B0BB] hover:text-white text-xs cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            {/* Lista de alternativas del banco */}
+            <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+              {(() => {
+                const alternatives = getFinisherAlternatives(
+                  swapAmrapModalState.amrapType,
+                  swapAmrapModalState.currentName,
+                  finisherEquipmentFilter,
+                  finisherSearchQuery
+                );
+
+                if (alternatives.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-[#A8B0BB] text-xs">
+                      No se encontraron ejercicios con este filtro. Intenta seleccionar "Todos" o borrar la búsqueda.
+                    </div>
+                  );
+                }
+
+                return alternatives.map((alt) => {
+                  const isCurrent = alt.name.toLowerCase().trim() === swapAmrapModalState.currentName.toLowerCase().trim();
+                  return (
+                    <div
+                      key={alt.id}
+                      className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
+                        isCurrent
+                          ? 'bg-[#15181D] border-purple-500/40 opacity-75'
+                          : 'bg-[#15181D] hover:bg-[#282F38] hover:border-purple-500/40 border-[#282F38]'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap mb-1">
+                          <span className="text-[10px] font-bold text-purple-300 bg-purple-950/60 border border-purple-800/40 px-2 py-0.5 rounded-md">
+                            {alt.category}
+                          </span>
+                          <span className="text-[10px] font-bold text-[#A8B0BB] bg-[#20252C] border border-[#282F38] px-2 py-0.5 rounded-md">
+                            {alt.equipment}
+                          </span>
+                        </div>
+                        <p className="font-extrabold text-xs text-white">{alt.name}</p>
+                        <p className="text-[11px] text-[#A8B0BB] mt-0.5 line-clamp-2">{alt.targetFocus}</p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setInspectedExercise(findExerciseDetail(alt.name))}
+                          className="p-2 bg-[#20252C] hover:bg-[#282F38] text-[#A8B0BB] hover:text-white rounded-xl text-xs transition-colors border border-[#282F38] cursor-pointer"
+                          title="Ver técnica detallada"
+                        >
+                          <Info className="w-3.5 h-3.5" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleSwapAmrapExercise(alt.name)}
+                          disabled={isCurrent}
+                          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                            isCurrent
+                              ? 'bg-[#282F38] text-[#717885] cursor-not-allowed'
+                              : 'bg-purple-600 hover:bg-purple-500 text-white shadow'
+                          }`}
+                        >
+                          {isCurrent ? 'Actual' : 'Elegir'}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end pt-3 mt-3 border-t border-[#282F38] shrink-0">
+              <button
+                onClick={() => setSwapAmrapModalState(null)}
+                className="px-4 py-2 bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] hover:text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cerrar
               </button>
             </div>
           </div>

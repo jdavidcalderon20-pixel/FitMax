@@ -1746,6 +1746,8 @@ function findSingleExercise(name: string): ExerciseDetail {
     const isHanging = /elevacion|elevación|colgado|pierna|rodilla/i.test(cleanName);
     const isRussian = /ruso|russian/i.test(cleanName);
     const isBear = /oso|bear/i.test(cleanName);
+    const isBicycle = /bicicleta|bicycle|air.*bike/i.test(cleanName);
+    const isFloorCrunch = !isCableCrunch && /crunch|colchoneta/i.test(cleanName);
     const media = isCableCrunch
       ? findExerciseMedia('cable crunch')
       : isWheel
@@ -1754,6 +1756,10 @@ function findSingleExercise(name: string): ExerciseDetail {
       ? findExerciseMedia('elevacion pierna')
       : isRussian
       ? findExerciseMedia('giro ruso')
+      : isBicycle
+      ? findExerciseMedia('bicicleta')
+      : isFloorCrunch
+      ? findExerciseMedia('crunches en colchoneta')
       : findExerciseMedia('plancha');
 
     return {
@@ -1762,7 +1768,7 @@ function findSingleExercise(name: string): ExerciseDetail {
       muscleGroup: 'Core',
       pattern: 'Aislamiento',
       level: 'A',
-      equipment: isCableCrunch ? 'Polea' : (isWheel || isRussian || isBear) ? 'Peso corporal' : equipmentGuess,
+      equipment: isCableCrunch ? 'Polea' : (isWheel || isRussian || isBear || isBicycle || isFloorCrunch) ? 'Peso corporal' : equipmentGuess,
       steps: isCableCrunch ? [
         'Arrodíllate frente a la polea alta con el accesorio de cuerda.',
         'Sujeta la cuerda a los lados de la cabeza y mantén los brazos fijos.',
@@ -1777,6 +1783,16 @@ function findSingleExercise(name: string): ExerciseDetail {
         'Siéntate con las rodillas flexionadas y reclina el torso hacia atrás a 45° con la espalda recta.',
         'Gira el torso de un lado al otro llevando las manos hacia la cadera opuesta con control.',
         'Siente la contracción oblicua en cada lado sin redondear los hombros.'
+      ] : isBicycle ? [
+        'Acuéstate sobre la colchoneta con las manos tras las orejas y piernas elevadas a 90°.',
+        'Lleva el codo hacia la rodilla contraria mientras extiendes la otra pierna al frente.',
+        'Alterna los lados de forma continua y fluida coordinando la rotación de hombros con el pedaleo.',
+        'Mantén la espalda baja en contacto con el suelo sin tirar del cuello.'
+      ] : isFloorCrunch ? [
+        'Acuéstate boca arriba con rodillas flexionadas y las yemas de los dedos tras las orejas.',
+        'Enrolla la columna despegando los omóplatos del suelo y contrayendo intensamente el abdomen.',
+        'Pausa 1 segundo en el punto máximo de contracción apretando el recto anterior.',
+        'Desciende de forma controlada hasta rozar la colchoneta sin rebotar.'
       ] : [
         'Adopta una postura estable activando la pared abdominal y los glúteos.',
         'Ejecuta el movimiento con control muscular estricto evitando tirar con el cuello o la zona lumbar.',
@@ -1791,6 +1807,10 @@ function findSingleExercise(name: string): ExerciseDetail {
         ? 'Estabilidad anti-rotación y fuerza isométrica del core en cuadrupedia.'
         : isRussian
         ? 'Fuerza rotacional y definición de los oblicuos y pared abdominal.'
+        : isBicycle
+        ? 'Activación electromiográfica combinada de oblicuos y recto abdominal.'
+        : isFloorCrunch
+        ? 'Aislamiento directo y seguro del recto abdominal sin máquinas ni poleas.'
         : 'Fuerza funcional, estabilidad central y definición del recto abdominal.',
       demoImages: media?.demoImages
     };

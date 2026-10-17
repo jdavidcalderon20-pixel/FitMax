@@ -1019,6 +1019,58 @@ export const EXERCISE_MEDIA_DATABASE: ExerciseMediaEntry[] = [
     ]
   },
   {
+    id: 'crunches_floor',
+    matchPatterns: [/crunch.*(colchoneta|suelo|suave|controlado)/i, /crunches.*(colchoneta|suelo)/i, /^(\d+\s*)?(abdominales tipo crunch|crunches en colchoneta)/i],
+    canonicalName: 'Crunches en colchoneta (Suelo)',
+    muscleGroup: 'Core',
+    pattern: 'Aislamiento',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Recto anterior del abdomen (porción superior y media)',
+    secondaryMuscles: ['Oblicuos'],
+    steps: [
+      'Acuéstate boca arriba en la colchoneta con las rodillas flexionadas y los pies firmes en el suelo.',
+      'Coloca las yemas de los dedos detrás de las orejas sin tirar de la nuca ni flexionar el cuello.',
+      'Enrolla la columna despegando los omóplatos del suelo y contrayendo intensamente el abdomen.',
+      'Pausa 1 segundo en el punto máximo de contracción y desciende de forma controlada hasta rozar la colchoneta.'
+    ],
+    commonMistakes: [
+      'Tirar de la cabeza con las manos provocando tensión cervical.',
+      'Despegar toda la espalda baja del suelo convirtiéndolo en una flexión de cadera.'
+    ],
+    breathingTip: 'Inhala en el suelo; exhala al despegar los omóplatos y contraer el abdomen.',
+    targetFocus: 'Aislamiento directo y seguro del recto abdominal sin necesidad de máquinas ni poleas.',
+    demoImages: [
+      `${CDN_BASE}/Crunches/0.jpg`,
+      `${CDN_BASE}/Crunches/1.jpg`
+    ]
+  },
+  {
+    id: 'air_bike',
+    matchPatterns: [/bicicleta/i, /bicycle/i, /air.*bike/i],
+    canonicalName: 'Abdominales bicicleta (Air bike crunches)',
+    muscleGroup: 'Core',
+    pattern: 'Aislamiento',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Oblicuos y recto anterior del abdomen',
+    secondaryMuscles: ['Flexores de cadera', 'Transverso abdominal'],
+    steps: [
+      'Acuéstate sobre la colchoneta con las manos tras las orejas y eleva las piernas con rodillas flexionadas a 90°.',
+      'Lleva el codo derecho hacia la rodilla izquierda mientras extiendes la pierna derecha al frente.',
+      'Alterna los lados de forma continua y fluida coordinando la rotación de hombros con el pedaleo.',
+      'Mantén la espalda baja en contacto con el suelo sin balancear el torso.'
+    ],
+    commonMistakes: [
+      'Tirar del cuello con los brazos o pedalear demasiado rápido sin control muscular.',
+      'Dejar que la zona lumbar se arquee al extender la pierna.'
+    ],
+    breathingTip: 'Exhala en cada cruce de codo con rodilla contraria; mantén un ritmo respiratorio constante.',
+    targetFocus: 'Alta activación electromiográfica combinada de oblicuos y recto abdominal.',
+    demoImages: [
+      `${CDN_BASE}/Air_Bike/0.jpg`,
+      `${CDN_BASE}/Air_Bike/1.jpg`
+    ]
+  },
+  {
     id: 'cable_crunch',
     matchPatterns: [/polea.*(crunch|abdominal)/i, /abdominal.*polea/i, /cable.*crunch/i, /crunches.*polea/i, /crunch.*polea/i],
     canonicalName: 'Abdominales en polea alta (Cable crunches)',
