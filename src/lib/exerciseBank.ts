@@ -1478,21 +1478,21 @@ function findSingleExercise(name: string): ExerciseDetail {
 
   // 4. Detección específica por grupo muscular y patrón para ejercicios dinámicos de las rutinas semanales
   const isCalves = /talon|talón|gemelo|pantorrilla|calf/i.test(cleanName);
-  const isArms = /curl|martillo|biceps|bíceps|triceps|tríceps|copa|frances|francés|rompecraneos|fondos.*banco|antebrazo|brazo/i.test(cleanName);
+  const isArms = /curl|martillo|biceps|bíceps|triceps|tríceps|tr[ií]ceps.*copa|copa.*tr[ií]ceps|frances|francés|rompecraneos|fondos.*banco|antebrazo|brazo/i.test(cleanName);
   const isGlute = /glute|hip thrust|puente|patada|abducc|rdl|rumano|isquio|frog pump|elevacion.*pelvis|elevación.*pelvis/i.test(cleanName);
-  const isSquat = /sentadilla|squat|cuadriceps|cuádriceps|prensa|leg extension|bulgara|búlgara|hack|zancada|step-?up|caja/i.test(cleanName);
+  const isSquat = /sentadilla|squat|goblet|cuadriceps|cuádriceps|prensa|leg extension|bulgara|búlgara|hack|zancada|step-?up|caja/i.test(cleanName);
   const isPull = /remo|jalon|jalón|dominada|pull|espalda|dorsal/i.test(cleanName);
   const isShoulders = !isCalves && /hombro|deltoid|militar|elevacion.*(lateral|frontal)|elevación.*(lateral|frontal)|pajaro|pájaro|face pull/i.test(cleanName);
   const isPush = /press.*(banca|plano|inclinado|pecho)|pecho|flexion|flexión|apertura|dips/i.test(cleanName);
   const isCore = /abdomen|abdominal|core|plancha|plank|crunch|rueda.*ab|rollout|elevacion.*(pierna|rodilla)|elevación.*(pierna|rodilla)|giro.*ruso|russian|twist|oso|bear|crawl|hollow/i.test(cleanName);
-  const isCarry = /carry|carga|bucket|sandbag|paseo|transporte/i.test(cleanName);
+  const isCarry = /carry|carga|bucket|sandbag|paseo|transporte|pellizco|pinch/i.test(cleanName);
   const isRunning = /carrera|correr|run|trote|intervalo|trail|sprint/i.test(cleanName);
 
   const equipmentGuess = /mancuerna/i.test(cleanName)
     ? 'Mancuernas'
     : /polea|cable/i.test(cleanName)
     ? 'Polea'
-    : /barra.*t/i.test(cleanName)
+    : /\bbarra\s*[-_]?\s*t\b/i.test(cleanName)
     ? 'Barra'
     : /barra/i.test(cleanName)
     ? 'Barra'
@@ -1500,12 +1500,17 @@ function findSingleExercise(name: string): ExerciseDetail {
     ? 'Máquina'
     : /kettlebell/i.test(cleanName)
     ? 'Kettlebell'
+    : /saco|balde/i.test(cleanName)
+    ? 'Saco / Lastre'
+    : /erg[oó]metro|skierg|concept2/i.test(cleanName)
+    ? 'Ergómetro'
     : /corporal|libre/i.test(cleanName)
     ? 'Peso corporal'
     : 'Mancuernas';
 
   if (isCalves) {
-    const media = findExerciseMedia('talon');
+    const isSeated = /sentado/i.test(cleanName);
+    const media = findExerciseMedia(isSeated ? 'talon sentado' : 'talon');
     return {
       id: `custom_calf_${cleanName.replace(/\s+/g, '_')}`,
       name,
@@ -1531,7 +1536,10 @@ function findSingleExercise(name: string): ExerciseDetail {
   if (isShoulders) {
     const isLateral = /lateral/i.test(cleanName);
     const isFrontal = /frontal/i.test(cleanName);
-    const media = isFrontal
+    const isFacePull = /face.*pull/i.test(cleanName);
+    const media = isFacePull
+      ? findExerciseMedia('face pull')
+      : isFrontal
       ? findExerciseMedia('elevacion frontal')
       : isLateral
       ? findExerciseMedia('elevacion lateral')
@@ -1576,8 +1584,13 @@ function findSingleExercise(name: string): ExerciseDetail {
   }
 
   if (isArms) {
-    const isTriceps = /triceps|tríceps|copa|frances|francés|rompecraneos|extension|extensión/i.test(cleanName);
-    const media = findExerciseMedia(isTriceps ? 'copa' : 'martillo');
+    const isPushdown = /cuerda|polea/i.test(cleanName);
+    const isTriceps = isPushdown || /triceps|tríceps|copa|frances|francés|rompecraneos|extension|extensión/i.test(cleanName);
+    const media = isPushdown
+      ? findExerciseMedia('extension triceps polea')
+      : isTriceps
+      ? findExerciseMedia('extension copa')
+      : findExerciseMedia('martillo');
     return {
       id: `custom_arm_${cleanName.replace(/\s+/g, '_')}`,
       name,
@@ -1607,17 +1620,26 @@ function findSingleExercise(name: string): ExerciseDetail {
   if (isGlute) {
     const isSeatedFemoral = /sentado/i.test(cleanName) && /femoral|isquio|curl/i.test(cleanName);
     const isLyingFemoral = /curl.*femoral/i.test(cleanName);
+    const isAbduction = /abducc/i.test(cleanName);
+    const isKickback = /patada|kickback/i.test(cleanName);
+    const isBridge = /puente/i.test(cleanName);
     const media = isSeatedFemoral
       ? findExerciseMedia('femoral sentado')
       : isLyingFemoral
       ? findExerciseMedia('curl femoral')
+      : isAbduction
+      ? findExerciseMedia('abduccion cadera')
+      : isKickback
+      ? findExerciseMedia('patada gluteo')
+      : isBridge
+      ? findExerciseMedia('puente gluteo')
       : findExerciseMedia('hip thrust');
 
     return {
       id: `custom_glute_${cleanName.replace(/\s+/g, '_')}`,
       name,
       muscleGroup: (isSeatedFemoral || isLyingFemoral) ? 'Isquios y Glúteo' : 'Glúteos',
-      pattern: (isSeatedFemoral || isLyingFemoral) ? 'Aislamiento' : 'Dominante cadera',
+      pattern: (isSeatedFemoral || isLyingFemoral || isAbduction || isKickback) ? 'Aislamiento' : 'Dominante cadera',
       level: 'A',
       equipment: equipmentGuess,
       steps: (isSeatedFemoral || isLyingFemoral) ? [
@@ -1646,6 +1668,9 @@ function findSingleExercise(name: string): ExerciseDetail {
     const isHack = /hack/i.test(cleanName);
     const isPress = /prensa/i.test(cleanName);
     const isExt = /extension|extensión/i.test(cleanName);
+    const isGoblet = /goblet|copa/i.test(cleanName);
+    const isFront = /frontal/i.test(cleanName);
+    const isSissy = /sissy/i.test(cleanName);
     const media = isBulgarian
       ? findExerciseMedia('sentadilla bulgara')
       : isHack
@@ -1654,13 +1679,19 @@ function findSingleExercise(name: string): ExerciseDetail {
       ? findExerciseMedia('prensa')
       : isExt
       ? findExerciseMedia('extension cuadriceps')
+      : isGoblet
+      ? findExerciseMedia('sentadilla copa')
+      : isFront
+      ? findExerciseMedia('sentadilla frontal')
+      : isSissy
+      ? findExerciseMedia('sentadilla sissy')
       : findExerciseMedia('sentadilla');
 
     return {
       id: `custom_squat_${cleanName.replace(/\s+/g, '_')}`,
       name,
       muscleGroup: 'Cuádriceps',
-      pattern: 'Dominante rodilla',
+      pattern: (isExt || isSissy) ? 'Aislamiento' : 'Dominante rodilla',
       level: 'A',
       equipment: equipmentGuess,
       steps: [
@@ -1817,14 +1848,17 @@ function findSingleExercise(name: string): ExerciseDetail {
   }
 
   if (isCarry) {
-    const media = findExerciseMedia('plancha');
+    const isFarmer = /granjero|farmer|pellizco|pinch/i.test(cleanName);
+    const media = isFarmer
+      ? findExerciseMedia('paseo granjero')
+      : findExerciseMedia('transporte saco') || findExerciseMedia('plancha');
     return {
       id: `custom_carry_${cleanName.replace(/\s+/g, '_')}`,
       name,
       muscleGroup: 'Cardio y Metabólico',
       pattern: 'Carga y Agarre',
       level: 'B',
-      equipment: 'Saco / Lastre',
+      equipment: isFarmer ? 'Kettlebell' : 'Saco / Lastre',
       steps: [
         'Levanta la carga con las piernas manteniendo la columna neutra.',
         'Camina erguido con pasos cortos y rápidos manteniendo el core blindado.',
@@ -1838,6 +1872,7 @@ function findSingleExercise(name: string): ExerciseDetail {
   }
 
   if (isRunning) {
+    const media = findExerciseMedia('correr');
     return {
       id: `custom_run_${cleanName.replace(/\s+/g, '_')}`,
       name,
@@ -1852,7 +1887,8 @@ function findSingleExercise(name: string): ExerciseDetail {
       ],
       commonMistakes: ['Dar zancadas demasiado largas impactando con el talón.'],
       breathingTip: 'Inhala en 2 zancadas, exhala en 2 zancadas.',
-      targetFocus: 'Resistencia cardiovascular y eficiencia de carrera.'
+      targetFocus: 'Resistencia cardiovascular y eficiencia de carrera.',
+      demoImages: media?.demoImages
     };
   }
 
@@ -1892,7 +1928,17 @@ export const findExerciseDetail = (name: string): ExerciseDetail => {
     };
   }
 
-  // Si contiene '+' o '/', es una superserie o biserie de dos ejercicios continuos
+  // 1. Si el ejercicio completo coincide directamente con una entrada multimedia o banco exacto, tratarlo como ejercicio único
+  const directMedia = findExerciseMedia(name);
+  if (directMedia) {
+    return findSingleExercise(name);
+  }
+  const directBank = EXERCISE_BANK.find((ex) => normalizeStr(ex.name) === normalizeStr(name));
+  if (directBank) {
+    return findSingleExercise(name);
+  }
+
+  // 2. Si contiene '+' o '/', es una superserie o biserie de dos ejercicios continuos
   if (name.includes('+') || name.includes('/')) {
     const parts = name.split(/\s*[\+\/]\s*/).map((p) => p.trim()).filter(Boolean);
     if (parts.length >= 2) {

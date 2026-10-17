@@ -84,7 +84,7 @@ describe('findExerciseDetail - Verificación estricta de técnica y fotos reales
     // Remo Pendlay debe ser con barra desde el piso (dead stop a 90 grados)
     expect(pendlay.muscleGroup).toBe('Espalda');
     expect(pendlay.demoImages).toBeDefined();
-    expect(pendlay.demoImages?.[0]).toContain('Bent_Over_Barbell_Row');
+    expect(pendlay.demoImages?.[0]).toContain('Barbell_Rear_Delt_Row');
     expect(pendlay.steps.some((s) => /dead stop|suelo|horizontal|piso|90°|90 grados/i.test(s))).toBe(true);
 
     // Las referencias de imagen NO deben ser iguales entre Meadows y Pendlay
@@ -160,6 +160,53 @@ describe('findExerciseDetail - Verificación estricta de técnica y fotos reales
     const res = findExerciseDetail('20 Giros rusos (Russian twists)');
     expect(res.muscleGroup).toBe('Core');
     expect(res.demoImages?.[0]).toContain('Russian_Twist');
+  });
+
+  describe('Validación estricta de los 31 ejercicios corregidos (sin desajustes ni fotos faltantes)', () => {
+    const verifiedExercises = [
+      { name: 'Abducción de cadera en máquina (Glúteo Medio)', image: 'Thigh_Abductor', group: 'Glúteos' },
+      { name: 'Extensiones de tríceps en polea con cuerda', image: 'Triceps_Pushdown_-_Rope_Attachment', group: 'Brazos' },
+      { name: 'Press de banca con pausa de 2s abajo', image: 'Barbell_Bench_Press_-_Medium_Grip', group: 'Pecho' },
+      { name: 'Sentadilla copa (Goblet Squat)', image: 'Goblet_Squat', group: 'Cuádriceps' },
+      { name: 'Sentadilla trasera con barra (Back Squat)', image: 'Barbell_Full_Squat', group: 'Cuádriceps' },
+      { name: 'Sentadilla frontal con barra (Front Squat)', image: 'Front_Barbell_Squat', group: 'Cuádriceps' },
+      { name: 'Extensiones de cuádriceps en máquina', image: 'Leg_Extensions', group: 'Cuádriceps' },
+      { name: 'Sentadilla sissy (inclinando el cuerpo hacia atrás)', image: 'Weighted_Sissy_Squat', group: 'Cuádriceps' },
+      { name: 'Empuje de cadera con barra (Hip thrust)', image: 'Barbell_Hip_Thrust', group: 'Glúteos' },
+      { name: 'Empuje de cadera con barra y pausa', image: 'Barbell_Hip_Thrust', group: 'Glúteos' },
+      { name: 'Patada de glúteo en polea a 30° (Cable Kickback)', image: 'One-Legged_Cable_Kickback', group: 'Glúteos' },
+      { name: 'Elevación de talones sentado en máquina', image: 'Seated_Calf_Raise', group: 'Isquios y Glúteo' },
+      { name: 'Remo Pendlay (remo desde el suelo)', image: 'Barbell_Rear_Delt_Row', group: 'Espalda' },
+      { name: 'Remo en barra T', image: 'Lying_T-Bar_Row', group: 'Espalda' },
+      { name: 'Press militar con barra de pie (Overhead Press)', image: 'Standing_Military_Press', group: 'Hombros' },
+      { name: 'SkiErg (máquina de esquí)', image: 'Rope_Straight-Arm_Pulldown', group: 'Cardio y Metabólico' },
+      { name: 'Empuje de trineo (Sled push)', image: 'Sled_Push', group: 'Cuádriceps' },
+      { name: 'Arrastre de trineo (Sled pull)', image: 'Sled_Drag_-_Harness', group: 'Espalda' },
+      { name: 'Burpee con salto largo (Burpee broad jumps)', image: 'Standing_Long_Jump', group: 'Cardio y Metabólico' },
+      { name: 'Remo en máquina (Rowing)', image: 'Rowing_Stationary', group: 'Cardio y Metabólico' },
+      { name: 'Paseo del granjero (Farmers carry)', image: 'Farmers_Walk', group: 'Cardio y Metabólico' },
+      { name: 'Zancadas con saco (Sandbag lunges)', image: 'Barbell_Walking_Lunge', group: 'Cuádriceps' },
+      { name: 'Lanzamientos de balón a la pared (Wall balls)', image: 'Catch_and_Overhead_Throw', group: 'Cardio y Metabólico' },
+      { name: 'Correr con piernas cansadas (Compromised running)', image: 'Running_Treadmill', group: 'Cardio y Metabólico' },
+      { name: 'Transporte de saco o balde (Sandbag / bucket carry)', image: 'Rickshaw_Carry', group: 'Cardio y Metabólico' },
+      { name: 'Colgado en barra (Dead hang pasivo y activo)', image: 'Scapular_Pull-Up', group: 'Espalda' },
+      { name: 'Towel Hang (Toalla sobre barra)', image: 'Scapular_Pull-Up', group: 'Espalda' },
+      { name: 'Pinch Grip Carry (Pellizco con discos)', image: 'Farmers_Walk', group: 'Brazos' },
+      { name: 'Transiciones de Barra / Monkey Bar Drills', image: 'Band_Assisted_Pull-Up', group: 'Espalda' },
+      { name: 'Face pull en polea con cuerda', image: 'Face_Pull', group: 'Hombros' },
+      { name: 'Puente de glúteos en suelo con peso', image: 'Barbell_Glute_Bridge', group: 'Glúteos' }
+    ];
+
+    verifiedExercises.forEach(({ name, image, group }) => {
+      it(`asigna imagen técnica precisa (${image}) y grupo (${group}) a "${name}"`, () => {
+        const res = findExerciseDetail(name);
+        expect(res.muscleGroup).toBe(group);
+        expect(res.demoImages).toBeDefined();
+        expect(res.demoImages?.length).toBe(2);
+        expect(res.demoImages?.[0]).toContain(image);
+        expect(res.demoImages?.[1]).toContain(image);
+      });
+    });
   });
 });
 
