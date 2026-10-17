@@ -41,7 +41,7 @@ export default function TrainModule({
     },
     {
       id: 'hiit' as const,
-      name: 'Cardio HIIT',
+      name: 'Cardio & Funcional',
       icon: Flame,
       color: 'text-rose-400',
       activeBg: 'bg-rose-500/15 border-rose-500 text-rose-300',

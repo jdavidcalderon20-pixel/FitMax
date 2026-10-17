@@ -1738,6 +1738,527 @@ export const EXERCISE_MEDIA_DATABASE: ExerciseMediaEntry[] = [
       `${CDN_BASE}/Band_Assisted_Pull-Up/0.jpg`,
       `${CDN_BASE}/Band_Assisted_Pull-Up/1.jpg`
     ]
+  },
+  {
+    id: 'burpees_full',
+    matchPatterns: [/burpee(s)?(\s+completo(s)?)?/i, /sprawl(s)?/i],
+    canonicalName: 'Burpees completos',
+    muscleGroup: 'Cardio y Metabólico',
+    pattern: 'Metabólico',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Capacidad glucolítica de cuerpo completo, cuádriceps, pecho y core',
+    secondaryMuscles: ['Tríceps', 'Glúteos', 'Pantorrillas', 'Hombros'],
+    steps: [
+      'Desde posición de pie, agáchate y apoya las manos firmes en el suelo delante de tus pies.',
+      'Lanza los pies hacia atrás con un salto llegando a posición de plancha alta.',
+      'Baja el pecho hasta rozar el suelo en una flexión controlada.',
+      'Empuja con fuerza hacia arriba, recoge los pies de un salto hacia tus manos y despega en un salto vertical con palmada sobre la cabeza.'
+    ],
+    commonMistakes: [
+      'Dejar caer la cadera arqueando la espalda lumbar al bajar o subir.',
+      'Aterrizar con las piernas rígidas sin amortiguar el impacto con rodillas flexionadas.'
+    ],
+    breathingTip: 'Inhala al descender hacia el suelo; exhala explosivamente al empujar y saltar.',
+    targetFocus: 'Acondicionamiento metabólico total, potencia y resistencia cardiovascular anaeróbica.',
+    demoImages: [
+      `${CDN_BASE}/Standing_Long_Jump/0.jpg`,
+      `${CDN_BASE}/Standing_Long_Jump/1.jpg`
+    ]
+  },
+  {
+    id: 'jumping_jacks',
+    matchPatterns: [/jumping\s*jacks?/i, /salto(s)?\s*de\s*tijera/i, /star\s*jumps?/i],
+    canonicalName: 'Saltos de tijera (Jumping jacks)',
+    muscleGroup: 'Cardio y Metabólico',
+    pattern: 'Metabólico',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Deltoides, gemelos, aductores y resistencia cardiovascular',
+    secondaryMuscles: ['Cuádriceps', 'Glúteos', 'Core'],
+    steps: [
+      'Comienza de pie con los pies juntos y los brazos a los lados del cuerpo.',
+      'Salta abriendo las piernas más allá del ancho de hombros mientras elevas los brazos por encima de la cabeza hasta casi tocar las palmas.',
+      'Vuelve de un salto suave a la posición inicial con pies juntos y brazos abajo.',
+      'Mantén un ritmo ágil y continuo aterrizando sobre las almohadillas de los pies.'
+    ],
+    commonMistakes: [
+      'Aterrizar con los talones de golpe transmitiendo el impacto a las articulaciones.',
+      'Perder la postura inclinando el torso hacia adelante.'
+    ],
+    breathingTip: 'Inhala al abrir brazos y piernas; exhala al cerrar.',
+    targetFocus: 'Activación cardiovascular, coordinación neuromuscular y elevación de temperatura central.',
+    demoImages: [
+      `${CDN_BASE}/Star_Jump/0.jpg`,
+      `${CDN_BASE}/Star_Jump/1.jpg`
+    ]
+  },
+  {
+    id: 'mountain_climbers',
+    matchPatterns: [/mountain\s*climbers?/i, /escalador(es)?/i],
+    canonicalName: 'Escaladores (Mountain climbers)',
+    muscleGroup: 'Cardio y Metabólico',
+    pattern: 'Metabólico',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Recto abdominal, flexores de cadera y deltoides anterior',
+    secondaryMuscles: ['Cuádriceps', 'Oblicuos', 'Pectorales', 'Tríceps'],
+    steps: [
+      'Colócate en posición de plancha alta con las manos alineadas directamente debajo de los hombros y el core apretado.',
+      'Lleva una rodilla hacia el pecho sin levantar la cadera ni arquear la espalda.',
+      'Regresa el pie hacia atrás mientras simultáneamente impulsas la rodilla contraria hacia el pecho en un movimiento continuo similar a correr en el suelo.',
+      'Mantén el cuello neutro y el peso distribuido de manera uniforme entre ambas manos.'
+    ],
+    commonMistakes: [
+      'Elevar la cadera formando una V invertida perdiendo la tensión en el abdomen.',
+      'Rebotar bruscamente con el pie delantero en el suelo en cada zancada.'
+    ],
+    breathingTip: 'Respira rítmicamente al compás de cada zancada sin contener el aire.',
+    targetFocus: 'Resistencia del core bajo alta fatiga y potencia aeróbica/anaeróbica.',
+    demoImages: [
+      `${CDN_BASE}/Mountain_Climbers/0.jpg`,
+      `${CDN_BASE}/Mountain_Climbers/1.jpg`
+    ]
+  },
+  {
+    id: 'jump_squats',
+    matchPatterns: [/sentadilla(s)?\s*con\s*salto/i, /jump\s*squats?/i],
+    canonicalName: 'Sentadillas con salto',
+    muscleGroup: 'Cuádriceps',
+    pattern: 'Dominante rodilla',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Potencia de cuádriceps, glúteos y gemelos',
+    secondaryMuscles: ['Core', 'Isquiotibiales', 'Erectores espinales'],
+    steps: [
+      'Pies al ancho de hombros con las puntas ligeramente abiertas a 15°.',
+      'Baja en sentadilla controlada hasta que los muslos queden paralelos al suelo.',
+      'Desde el fondo, empuja el suelo de forma explosiva y salta hacia arriba extendiendo tobillos, rodillas y caderas simultáneamente.',
+      'Aterriza de puntas a talones flexionando las rodillas de inmediato para amortiguar el impacto y encadenar la siguiente repetición.'
+    ],
+    commonMistakes: [
+      'Colapso de rodillas hacia adentro (valgo) al despegar o al aterrizar.',
+      'Aterrizar rígidamente con las piernas extendidas.'
+    ],
+    breathingTip: 'Inhala mientras bajas en sentadilla; exhala con fuerza al explotar en el salto.',
+    targetFocus: 'Desarrollo de potencia vertical y capacidad reactiva del tren inferior.',
+    demoImages: [
+      `${CDN_BASE}/Freehand_Jump_Squat/0.jpg`,
+      `${CDN_BASE}/Freehand_Jump_Squat/1.jpg`
+    ]
+  },
+  {
+    id: 'split_jumps',
+    matchPatterns: [/zancada(s)?\s*con\s*salto/i, /zancadas?\s*pliom[eé]tricas?/i, /split\s*jumps?/i, /lunge\s*jumps?/i],
+    canonicalName: 'Zancadas con salto alternadas',
+    muscleGroup: 'Cuádriceps',
+    pattern: 'Dominante rodilla',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Cuádriceps, glúteo mayor y estabilidad unilateral',
+    secondaryMuscles: ['Gemelos', 'Isquiotibiales', 'Core'],
+    steps: [
+      'Inicia en posición de zancada con ambas rodillas flexionadas a 90° y el torso erguido.',
+      'Impúlsate explosivamente hacia arriba con ambas piernas despegando del suelo.',
+      'En el aire, intercambia la posición de los pies rápidamente.',
+      'Aterriza con suavidad en zancada con la pierna contraria al frente y repite sin pausa.'
+    ],
+    commonMistakes: [
+      'Golpear la rodilla trasera contra el suelo.',
+      'Inclinarse excesivamente hacia adelante perdiendo el equilibrio.'
+    ],
+    breathingTip: 'Exhala en cada salto de cambio; inhala al amortiguar el aterrizaje.',
+    targetFocus: 'Potencia unilateral reactiva, equilibrio dinámico y resistencia láctica.',
+    demoImages: [
+      `${CDN_BASE}/Split_Jump/0.jpg`,
+      `${CDN_BASE}/Split_Jump/1.jpg`
+    ]
+  },
+  {
+    id: 'plyo_pushups',
+    matchPatterns: [/flexi[oó]n(es)?\s*explosiva(s)?/i, /plyo\s*push.*ups?/i, /flexiones\s*con\s*salto/i],
+    canonicalName: 'Flexiones explosivas',
+    muscleGroup: 'Pecho',
+    pattern: 'Empuje horizontal',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Pectoral mayor, deltoides anterior y tríceps braquial',
+    secondaryMuscles: ['Serrato anterior', 'Core', 'Glúteos'],
+    steps: [
+      'Ponte en posición de flexión con las manos al ancho de los hombros y el cuerpo alineado de pies a cabeza.',
+      'Baja el pecho de forma controlada hasta rozar el suelo.',
+      'Empuja contra el suelo con máxima aceleración de modo que las manos se despeguen del suelo en la parte alta.',
+      'Aterriza con los codos ligeramente flexionados para absorber la fuerza y bajar de inmediato a la siguiente repetición.'
+    ],
+    commonMistakes: [
+      'Dejar caer la pelvis arqueando la zona lumbar.',
+      'Aterrizar con los codos bloqueados.'
+    ],
+    breathingTip: 'Inhala en el descenso; exhala con un estallido al despegar las manos del suelo.',
+    targetFocus: 'Potencia de empuje del tren superior y reclutamiento de fibras rápidas.',
+    demoImages: [
+      `${CDN_BASE}/Plyo_Push-up/0.jpg`,
+      `${CDN_BASE}/Plyo_Push-up/1.jpg`
+    ]
+  },
+  {
+    id: 'plank_jacks',
+    matchPatterns: [/plancha\s*con\s*saltos?/i, /plank\s*jacks?/i],
+    canonicalName: 'Plancha con saltos de pies',
+    muscleGroup: 'Core',
+    pattern: 'Metabólico',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Transverso del abdomen, recto anterior y abductores de cadera',
+    secondaryMuscles: ['Hombros', 'Glúteo medio', 'Gemelos'],
+    steps: [
+      'Colócate en plancha sobre antebrazos o manos con los pies juntos y el abdomen contraído.',
+      'Salta separando los pies más allá del ancho de caderas mientras mantienes el torso totalmente inmóvil.',
+      'Salta inmediatamente regresando los pies al centro con suavidad.',
+      'Evita que la pelvis suba o baje durante los rebotes.'
+    ],
+    commonMistakes: [
+      'Rebotar con la pelvis arriba y abajo perdiendo la rigidez del core.'
+    ],
+    breathingTip: 'Mantén una respiración rítmica y controlada por la nariz.',
+    targetFocus: 'Estabilidad del core dinámico y elevación del ritmo cardíaco sin impacto en brazos.',
+    demoImages: [
+      `${CDN_BASE}/Plank/0.jpg`,
+      `${CDN_BASE}/Plank/1.jpg`
+    ]
+  },
+  {
+    id: 'high_knees',
+    matchPatterns: [/rodillas?\s*arriba/i, /skipping\s*alto/i, /high\s*knees?/i],
+    canonicalName: 'Rodillas arriba',
+    muscleGroup: 'Cardio y Metabólico',
+    pattern: 'Metabólico',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Flexores de cadera (psoas), pantorrillas y cuádriceps',
+    secondaryMuscles: ['Core', 'Glúteos', 'Brazos'],
+    steps: [
+      'De pie en el lugar, corre elevando las rodillas de forma alterna por encima del nivel de las caderas (90°).',
+      'Bracea con energía en sincronía con las piernas opuestas.',
+      'Aterriza elásticamente sobre las almohadillas de los pies con tobillos reactivos.',
+      'Mantén el tronco erguido sin reclinarte hacia atrás.'
+    ],
+    commonMistakes: [
+      'Inclinarse hacia atrás compensando la falta de flexión de cadera.',
+      'No subir las rodillas a la altura adecuada.'
+    ],
+    breathingTip: 'Inhala en 2 zancadas, exhala en 2 zancadas rítmicamente.',
+    targetFocus: 'Cadencia de carrera, reactividad de tobillo y acondicionamiento cardiovascular.',
+    demoImages: [
+      `${CDN_BASE}/Knee_Tuck_Jump/0.jpg`,
+      `${CDN_BASE}/Knee_Tuck_Jump/1.jpg`
+    ]
+  },
+  {
+    id: 'kettlebell_swings',
+    matchPatterns: [/balanceo(s)?\s*con\s*pesa\s*rusa/i, /kettlebell\s*swings?/i, /swing(s)?\s*con\s*kettlebell/i, /swing.*pesa.*rusa/i],
+    canonicalName: 'Balanceos con pesa rusa (Kettlebell swings)',
+    muscleGroup: 'Isquios y Glúteo',
+    pattern: 'Dominante cadera',
+    equipment: 'Kettlebell',
+    primaryMuscle: 'Glúteo mayor, isquiotibiales y cadena posterior explosiva',
+    secondaryMuscles: ['Erectores espinales', 'Antebrazos', 'Deltoides anterior', 'Core'],
+    steps: [
+      'Pies ligeramente más anchos que los hombros con la pesa rusa en el suelo un paso por delante de ti.',
+      'Inclina la cadera en bisagra (hombros por encima de caderas, caderas por encima de rodillas) y toma el asa con ambas manos.',
+      'Pasa la pesa entre las piernas cargando los isquiotibiales como un resorte.',
+      'Extiende con violencia las caderas y glúteos proyectando la pesa hacia adelante por pura inercia hasta la altura del pecho.',
+      'Deja que la pesa caiga libremente y vuelve a amortiguar en bisagra de cadera profunda.'
+    ],
+    commonMistakes: [
+      'Convertir el movimiento en sentadilla doblando en exceso las rodillas.',
+      'Levantar la pesa con los hombros o brazos en lugar del empuje de cadera.',
+      'Hiperextender la zona lumbar en la cima.'
+    ],
+    breathingTip: 'Inhala mientras la pesa pasa entre las piernas; exhala con fuerza siseando al bloquear glúteos arriba.',
+    targetFocus: 'Potencia balística de cadera, quema calórica extrema y salud lumbar/glútea.',
+    demoImages: [
+      `${CDN_BASE}/One-Arm_Kettlebell_Swings/0.jpg`,
+      `${CDN_BASE}/One-Arm_Kettlebell_Swings/1.jpg`
+    ]
+  },
+  {
+    id: 'snatch_kettlebell',
+    matchPatterns: [/arrancada.*(mancuerna|pesa|kettlebell)/i, /snatch/i],
+    canonicalName: 'Arrancada con mancuerna (Snatch)',
+    muscleGroup: 'Cardio y Metabólico',
+    pattern: 'Metabólico',
+    equipment: 'Kettlebell',
+    primaryMuscle: 'Cadena posterior completa, trapecios y deltoides en un solo impulso',
+    secondaryMuscles: ['Glúteos', 'Isquiotibiales', 'Tríceps', 'Core'],
+    steps: [
+      'Comienza con la pesa en el suelo entre los pies.',
+      'Toma la mancuerna o pesa con una mano con la columna neutra y las caderas en bisagra.',
+      'Extiende piernas y caderas con máxima aceleración, manteniendo la carga pegada al cuerpo.',
+      'Cuando la carga alcance el pecho, desliza la mano por debajo y extiende el brazo bloqueando la carga directamente sobre la cabeza en un movimiento fluido.',
+      'Desciende con control al suelo o cambia de mano.'
+    ],
+    commonMistakes: [
+      'Alejar la pesa del cuerpo en un arco amplio cargando el hombro.',
+      'No usar la potencia de las piernas para propulsar el peso hacia arriba.'
+    ],
+    breathingTip: 'Exhala enérgicamente en el bloqueo superior; inhala al bajar.',
+    targetFocus: 'Potencia unilateral de cuerpo entero y velocidad de transferencia de fuerza.',
+    demoImages: [
+      `${CDN_BASE}/One-Arm_Kettlebell_Snatch/0.jpg`,
+      `${CDN_BASE}/One-Arm_Kettlebell_Snatch/1.jpg`
+    ]
+  },
+  {
+    id: 'skaters',
+    matchPatterns: [/patinador(es)?/i, /skaters?/i, /salto(s)?\s*lateral(es)?/i],
+    canonicalName: 'Patinadores laterales (Skaters)',
+    muscleGroup: 'Glúteos',
+    pattern: 'Dominante rodilla',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Glúteo medio, aductores y estabilizadores laterales de rodilla/tobillo',
+    secondaryMuscles: ['Cuádriceps', 'Core', 'Gemelos'],
+    steps: [
+      'Comienza de pie con una rodilla ligeramente flexionada.',
+      'Empuja lateralmente con fuerza saltando hacia el lado derecho, aterrizando sobre el pie derecho.',
+      'Cruza la pierna izquierda por detrás sin que toque el suelo y amortigua flexionando la cadera y rodilla derecha.',
+      'Inmediatamente empuja con el pie derecho para saltar hacia la izquierda en un movimiento fluido de patinador sobre hielo.'
+    ],
+    commonMistakes: [
+      'Aterrizar con la rodilla colapsando hacia adentro sin control del glúteo medio.',
+      'Hacer saltos muy cortos sin comprometer la potencia lateral.'
+    ],
+    breathingTip: 'Exhala en cada impulso lateral; inhala en la recepción.',
+    targetFocus: 'Fuerza en el plano frontal, prevención de lesiones de rodilla y agilidad atlética.',
+    demoImages: [
+      `${CDN_BASE}/Lateral_Box_Jump/0.jpg`,
+      `${CDN_BASE}/Lateral_Box_Jump/1.jpg`
+    ]
+  },
+  {
+    id: 'rope_jumping',
+    matchPatterns: [/salto(s)?\s*de\s*cuerda/i, /salto(s)?\s*a\s*la\s*comba/i, /rope\s*jump/i],
+    canonicalName: 'Saltos de cuerda virtuales',
+    muscleGroup: 'Cardio y Metabólico',
+    pattern: 'Metabólico',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Sóleo, gemelos, tendón de Aquiles y resistencia aeróbica',
+    secondaryMuscles: ['Deltoides', 'Antebrazos', 'Core'],
+    steps: [
+      'Sostén la cuerda o realiza el movimiento virtual con codos pegados a los costados y rotación desde las muñecas.',
+      'Salta apenas 2 a 3 cm sobre el suelo manteniendo los pies y tobillos elásticos.',
+      'Aterriza suavemente sobre las almohadillas de los pies absorbiendo con las pantorrillas sin flexionar en exceso las rodillas.',
+      'Mantén la mirada al frente y la respiración regular.'
+    ],
+    commonMistakes: [
+      'Saltar demasiado alto flexionando las rodillas hacia atrás.',
+      'Rotar los brazos enteros desde los hombros en lugar de usar las muñecas.'
+    ],
+    breathingTip: 'Respira calmado y continuo para mantener las pulsaciones en zona eficiente.',
+    targetFocus: 'Rigidez elástica del tendón de Aquiles, economía de rebote y alta densidad calórica.',
+    demoImages: [
+      `${CDN_BASE}/Rope_Jumping/0.jpg`,
+      `${CDN_BASE}/Rope_Jumping/1.jpg`
+    ]
+  },
+  {
+    id: 'commando_pushups',
+    matchPatterns: [/flexi[oó]n(es)?\s*comando/i, /plancha\s*comando/i, /push\s*up\s*to\s*plank/i],
+    canonicalName: 'Flexiones comando',
+    muscleGroup: 'Core',
+    pattern: 'Metabólico',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Tríceps, hombros, recto abdominal y estabilizadores escapulares',
+    secondaryMuscles: ['Pectorales', 'Oblicuos'],
+    steps: [
+      'Inicia en plancha apoyando los antebrazos con el core contraído y los pies al ancho de hombros.',
+      'Apoya la palma derecha en el suelo exactamente debajo del hombro y empuja hacia arriba; repite con la mano izquierda para quedar en plancha alta.',
+      'Baja de nuevo el codo derecho al suelo y luego el codo izquierdo volviendo a la plancha sobre antebrazos.',
+      'Alterna el brazo que lidera la subida en cada repetición manteniendo las caderas lo más fijas posible.'
+    ],
+    commonMistakes: [
+      'Balancear las caderas de lado a lado como un péndulo al subir.'
+    ],
+    breathingTip: 'Exhala al empujar hacia la posición alta; inhala al descender sobre los antebrazos.',
+    targetFocus: 'Anti-rotación del core, fuerza funcional de tríceps y control escapular.',
+    demoImages: [
+      `${CDN_BASE}/Push_Up_to_Side_Plank/0.jpg`,
+      `${CDN_BASE}/Push_Up_to_Side_Plank/1.jpg`
+    ]
+  },
+  {
+    id: 'hollow_rocks',
+    matchPatterns: [/hollow.*rock(s)?/i, /hollow/i, /canoa.*abdominal/i],
+    canonicalName: 'Hollow rocks de abdomen',
+    muscleGroup: 'Core',
+    pattern: 'Aislamiento',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Recto abdominal profundo, transverso del abdomen y flexores de cadera',
+    secondaryMuscles: ['Cuádriceps', 'Dorsales'],
+    steps: [
+      'Acuéstate boca arriba en el suelo. Pega la zona lumbar contra la colchoneta sin dejar ningún hueco.',
+      'Extiende los brazos por detrás de la cabeza y las piernas estiradas a unos 15-20 cm del suelo formando una postura cóncava ("banana").',
+      'Manteniendo esa estructura completamente rígida como un bloque sólido, balancéate suavemente hacia adelante y atrás desde la espalda baja.',
+      'Si la zona lumbar se despega del suelo, flexiona ligeramente las rodillas para acortar la palanca.'
+    ],
+    commonMistakes: [
+      'Arquear la columna lumbar despegándola del suelo.',
+      'Mover los brazos o piernas de forma independiente en lugar de balancear todo el cuerpo en bloque.'
+    ],
+    breathingTip: 'Respira con respiraciones cortas y superficiales manteniendo la presión intraabdominal.',
+    targetFocus: 'Tensión abdominal global isométrica y fuerza transferible a gimnasia y calistenia.',
+    demoImages: [
+      `${CDN_BASE}/Jackknife_Sit-Up/0.jpg`,
+      `${CDN_BASE}/Jackknife_Sit-Up/1.jpg`
+    ]
+  },
+  {
+    id: 'treadmill_running',
+    matchPatterns: [/cinta.*correr/i, /sprint.*cinta/i, /correr.*cinta/i],
+    canonicalName: 'Cinta de correr a buen ritmo',
+    muscleGroup: 'Cardio y Metabólico',
+    pattern: 'Metabólico',
+    equipment: 'Peso corporal',
+    primaryMuscle: 'Capacidad aeróbica, cuádriceps, glúteos e isquiotibiales',
+    secondaryMuscles: ['Gemelos', 'Core'],
+    steps: [
+      'Sube a la cinta con postura erguida y hombros relajados.',
+      'Aumenta la velocidad a tu ritmo objetivo de trabajo.',
+      'Corre aterrizando con el mediopié justo debajo del centro de masa, manteniendo una cadencia ágil.',
+      'Brazos oscilando en 90° relajados sin cruzar la línea media del pecho.'
+    ],
+    commonMistakes: [
+      'Agarrarse de las barandillas de la cinta mientras se corre.',
+      'Dar zancadas excesivamente largas impactando con el talón.'
+    ],
+    breathingTip: 'Patrón de respiración rítmico 2:2 (dos pasos inhalando, dos pasos exhalando).',
+    targetFocus: 'Consumo máximo de oxígeno y resistencia cardiovascular continua.',
+    demoImages: [
+      `${CDN_BASE}/Running_Treadmill/0.jpg`,
+      `${CDN_BASE}/Running_Treadmill/1.jpg`
+    ]
+  },
+  {
+    id: 'stationary_bike',
+    matchPatterns: [/bicicleta\s*est[aá]tica/i, /bici\s*est[aá]tica/i, /airbike/i, /air\s*bike/i],
+    canonicalName: 'Bicicleta estática intensa',
+    muscleGroup: 'Cardio y Metabólico',
+    pattern: 'Metabólico',
+    equipment: 'Ergómetro',
+    primaryMuscle: 'Cuádriceps, glúteos y sistema cardiovascular con cero impacto articular',
+    secondaryMuscles: ['Gemelos', 'Isquiotibiales'],
+    steps: [
+      'Ajusta el sillín a la altura de tu cadera de modo que la rodilla quede con un leve ángulo de 25-30° al pedalear abajo.',
+      'Toma los manillares con firmeza sin tensar el cuello ni los hombros.',
+      'Pedalea a cadencia alta (85-105 RPM) aplicando fuerza tanto al empujar el pedal como al levantarlo.',
+      'En fases de sprint o alta resistencia, activa el core para no bambolear el torso.'
+    ],
+    commonMistakes: [
+      'Sillín demasiado bajo sobrecargando la rótula.'
+    ],
+    breathingTip: 'Inhalaciones profundas por la nariz y exhalaciones rítmicas por la boca.',
+    targetFocus: 'Entrenamiento cardiovascular de alta potencia sin estrés articular en rodillas o tobillos.',
+    demoImages: [
+      `${CDN_BASE}/Air_Bike/0.jpg`,
+      `${CDN_BASE}/Air_Bike/1.jpg`
+    ]
+  },
+  {
+    id: 'kettlebell_thruster',
+    matchPatterns: [/thruster(s)?/i, /kettlebell.*thruster/i],
+    canonicalName: 'Thruster con kettlebells o mancuernas',
+    muscleGroup: 'Cuádriceps',
+    pattern: 'Dominante rodilla',
+    equipment: 'Kettlebell',
+    primaryMuscle: 'Cuádriceps, glúteos y deltoides en un movimiento compuesto continuo',
+    secondaryMuscles: ['Tríceps', 'Core', 'Erectores espinales'],
+    steps: [
+      'Posiciona dos kettlebells o mancuernas a la altura de los hombros en posición rack.',
+      'Desciende en sentadilla completa rompiendo el paralelo con el pecho alto y los codos levantados.',
+      'Sube de forma explosiva desde el fondo empujando el suelo con toda la planta del pie.',
+      'Usa el impulso de la subida de piernas para transferir la energía hacia los brazos y empujar la carga por encima de la cabeza en un press militar fluido.',
+      'Baja la carga a los hombros mientras comienzas el descenso a la siguiente sentadilla.'
+    ],
+    commonMistakes: [
+      'Pausar entre la sentadilla y el press perdiendo el impulso de las piernas.',
+      'Colapsar el pecho hacia adelante durante la sentadilla.'
+    ],
+    breathingTip: 'Inhala al descender; exhala con fuerza al llegar a la extensión completa arriba.',
+    targetFocus: 'Máxima demanda metabólica, integración de tren inferior y superior y potencia funcional.',
+    demoImages: [
+      `${CDN_BASE}/Kettlebell_Thruster/0.jpg`,
+      `${CDN_BASE}/Kettlebell_Thruster/1.jpg`
+    ]
+  },
+  {
+    id: 'battling_ropes',
+    matchPatterns: [/cuerdas?\s*de\s*batalla/i, /battling\s*ropes?/i, /battle\s*ropes?/i],
+    canonicalName: 'Cuerdas de batalla (Battling ropes)',
+    muscleGroup: 'Cardio y Metabólico',
+    pattern: 'Metabólico',
+    equipment: 'Ergómetro',
+    primaryMuscle: 'Hombros, antebrazos, core y capacidad anaeróbica láctica',
+    secondaryMuscles: ['Pectorales', 'Dorsales', 'Piernas'],
+    steps: [
+      'Toma un extremo de la cuerda en cada mano con agarre neutro y ponte en posición de media sentadilla atlética con el pecho erguido.',
+      'Genera ondas continuas alternando los brazos hacia arriba y abajo con máxima velocidad y potencia.',
+      'Mantén los codos semi-flexionados y el core apretado para no tambalear el tronco.',
+      'Procura que las ondas viajen limpiamente hasta el punto de anclaje de la cuerda.'
+    ],
+    commonMistakes: [
+      'Levantarse perdiendo la postura atlética y dejando caer los hombros.',
+      'Mover solo las muñecas en lugar de involucrar los deltoides y la musculatura escapular.'
+    ],
+    breathingTip: 'Respira con exhalaciones cortas y explosivas con cada latigazo.',
+    targetFocus: 'Potencia anaeróbica del tren superior sin impacto articular en extremidades inferiores.',
+    demoImages: [
+      `${CDN_BASE}/Battling_Ropes/0.jpg`,
+      `${CDN_BASE}/Battling_Ropes/1.jpg`
+    ]
+  },
+  {
+    id: 'kettlebell_clean',
+    matchPatterns: [/cargada.*(kettlebell|mancuerna|pesa)/i, /kettlebell\s*clean/i, /clean.*mancuerna/i],
+    canonicalName: 'Cargada con kettlebell o mancuerna (Clean)',
+    muscleGroup: 'Isquios y Glúteo',
+    pattern: 'Dominante cadera',
+    equipment: 'Kettlebell',
+    primaryMuscle: 'Glúteos, isquiotibiales, trapecios y fuerza de agarre',
+    secondaryMuscles: ['Bíceps', 'Deltoides', 'Core'],
+    steps: [
+      'Coloca la pesa rusa en el suelo entre tus pies y flexiona la cadera en bisagra.',
+      'Toma el asa con una o dos manos y genera un tirón explosivo desde las caderas manteniendo la pesa cerca del torso.',
+      'Gira suavemente la mano alrededor del asa mientras la pesa sube para amortiguar en posición de rack sobre el antebrazo sin que golpee la muñeca.',
+      'Bloquea rodillas y glúteos en la posición final erguida.'
+    ],
+    commonMistakes: [
+      'Dejar que la pesa rusa se desplace lejos del cuerpo y golpee con fuerza el antebrazo.'
+    ],
+    breathingTip: 'Exhala al encajar la pesa en el rack; inhala al bajar.',
+    targetFocus: 'Potencia de cadera, coordinación motora y preparación para presses o thrusters.',
+    demoImages: [
+      `${CDN_BASE}/Two-Arm_Kettlebell_Clean/0.jpg`,
+      `${CDN_BASE}/Two-Arm_Kettlebell_Clean/1.jpg`
+    ]
+  },
+  {
+    id: 'box_jumps',
+    matchPatterns: [/saltos?\s*al\s*caj[oó]n/i, /box\s*jumps?/i],
+    canonicalName: 'Saltos al cajón (Box jumps)',
+    muscleGroup: 'Cuádriceps',
+    pattern: 'Dominante rodilla',
+    equipment: 'Caja / Banco',
+    primaryMuscle: 'Potencia explosiva vertical de cuádriceps, glúteos y pantorrillas',
+    secondaryMuscles: ['Isquiotibiales', 'Core'],
+    steps: [
+      'Párate frente al cajón a una distancia cómoda (unos 30-40 cm) con los pies al ancho de caderas.',
+      'Balancea los brazos hacia atrás mientras flexionas caderas y rodillas en un cuarto de sentadilla.',
+      'Lanza los brazos hacia arriba y extiende caderas con máxima aceleración saltando sobre el cajón.',
+      'Aterriza con ambos pies simultáneamente sobre el centro del cajón en media sentadilla suave sin ruido.',
+      'Ponte de pie con extensión completa y baja dando un paso hacia atrás (step-down) para proteger los tendones de Aquiles.'
+    ],
+    commonMistakes: [
+      'Aterrizar con los talones en el borde del cajón con riesgo de resbalar.',
+      'Bajar saltando de espaldas con alto impacto en rodillas y tendón.'
+    ],
+    breathingTip: 'Exhala en el despegue; inhala al aterrizar y ponerte erguido.',
+    targetFocus: 'Potencia concéntrica pura sin impacto excéntrico agresivo.',
+    demoImages: [
+      `${CDN_BASE}/Box_Jump_Multiple_Response/0.jpg`,
+      `${CDN_BASE}/Box_Jump_Multiple_Response/1.jpg`
+    ]
   }
 ];
 

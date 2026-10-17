@@ -29,4 +29,18 @@ describe('Running Plans (runningPlans.ts)', () => {
     expect(plan[0].distanceKm).toBeGreaterThan(0);
     expect(plan[3].distanceKm).toBeGreaterThan(plan[0].distanceKm);
   });
+
+  it('adapta el plan dinámicamente según la fase de periodización', () => {
+    const basePlan = generateRunningPlan('10K', 5.0, 'base', 1, 12);
+    const potenciaPlan = generateRunningPlan('10K', 5.0, 'potencia', 5, 12);
+    const compromisedPlan = generateRunningPlan('10K', 5.0, 'compromised', 9, 12);
+    const taperingPlan = generateRunningPlan('10K', 5.0, 'tapering', 12, 12);
+
+    expect(basePlan[1].name).toContain('Fartlek');
+    expect(potenciaPlan[1].name).toContain('1000m');
+    expect(compromisedPlan[1].name).toContain('2000m');
+    expect(taperingPlan[0].distanceKm).toBeLessThan(basePlan[0].distanceKm);
+    expect(taperingPlan[3].name).toContain('10K');
+  });
 });
+

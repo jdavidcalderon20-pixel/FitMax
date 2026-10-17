@@ -40,7 +40,8 @@ import {
   generateRunningPlan, 
   calculateRaceFinishTime, 
   formatPaceDecimal, 
-  PlannedRunningSession 
+  PlannedRunningSession,
+  getRunningCoachGuidance 
 } from '../lib/runningPlans';
 import { calculatePacesFrom10K } from '../data/runningPlansData';
 import { useAuth } from '../lib/auth';
@@ -80,6 +81,8 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
   const [raceDistance, setRaceDistance] = useState<RaceDistance>('10K');
   const [targetPace, setTargetPace] = useState<number>(5.0); // 5:00 min/km por defecto
   const [completedPlanIds, setCompletedPlanIds] = useState<Record<string, boolean>>({});
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [showAllSessions, setShowAllSessions] = useState<boolean>(false);
 
   const [formDate, setFormDate] = useState(todayStr());
   const [formDistance, setFormDistance] = useState('');
@@ -259,6 +262,17 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
   };
 
   const handleQuickLogPlannedSession = async (session: PlannedRunningSession) => {
+    if (completedPlanIds[session.id]) {
+      setCompletedPlanIds((prev) => {
+        const copy = { ...prev };
+        delete copy[session.id];
+        return copy;
+      });
+      setSyncMsg(`Sesión "${session.dayTitle}" marcada como pendiente.`);
+      setTimeout(() => setSyncMsg(null), 3000);
+      return;
+    }
+
     const draft = {
       date: Date.now(),
       distanceKm: session.distanceKm,
@@ -293,28 +307,46 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
   const volumeFeedback = getVolumeFeedback(logs);
   const polarizationFeedback = getPolarizationFeedback(weekStats);
 
+  const currentWeekNumber = Math.max(1, targetWeeks - weeksRemaining + 1);
   const phaseDetails = getPhaseFromWeeks(weeksRemaining, targetWeeks, 'running');
-  const plannedSessions = generateRunningPlan(raceDistance, targetPace);
+  const plannedSessions = generateRunningPlan(
+    raceDistance,
+    targetPace,
+    phaseDetails.phase,
+    currentWeekNumber,
+    targetWeeks
+  );
+  const coachGuidance = getRunningCoachGuidance(
+    phaseDetails.phase,
+    raceDistance,
+    currentWeekNumber,
+    targetWeeks,
+    targetPace
+  );
   const paceZones = calculatePacesFrom10K(targetPace);
   const typeLabel = (t: RunType) => RUN_TYPES.find((rt) => rt.id === t)?.label || t;
+
+  // Sesión actualmente seleccionada por el atleta (libertad total de inspección y orden)
+  const activeSession = plannedSessions.find((s) => s.id === selectedSessionId) || plannedSessions[0];
+  const isActiveCompleted = Boolean(completedPlanIds[activeSession.id]);
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex items-start justify-between mb-6 gap-3 flex-wrap">
         <div>
-          <h2 className="text-xl md:text-2xl font-black tracking-tight text-zinc-900 flex items-center gap-2.5">
-            <Footprints className="w-6 h-6 text-emerald-500" />
+          <h2 className="text-xl md:text-2xl font-black tracking-tight text-[#F4F2ED] flex items-center gap-2.5">
+            <Footprints className="w-6 h-6 text-[#1FD08A]" />
             Running
           </h2>
-          <p className="text-zinc-500 text-sm mt-1">
-            Registra tus carreras y sigue tu progresión de volumen e intensidad
+          <p className="text-[#A8B0BB] text-sm mt-1">
+            Planes periodizados inteligentes (80/20), ritmos calibrados y registro GPS
           </p>
         </div>
         <div className="relative flex items-center gap-2">
           {user && (
             <button
               onClick={signOut}
-              className="flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold px-3 py-2.5 rounded-xl text-xs transition-all shrink-0"
+              className="flex items-center gap-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-bold px-3 py-2.5 rounded-xl text-xs transition-all shrink-0 cursor-pointer"
               title={`Conectado como ${user.email} — clic para salir`}
             >
               <Cloud className="w-3.5 h-3.5" />
@@ -383,166 +415,236 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
       )}
 
       {hasLocalToSync && user && (
-        <div className="mb-4 bg-emerald-50 border border-emerald-200 rounded-2xl p-3.5 flex items-center justify-between gap-3 flex-wrap">
+        <div className="mb-4 bg-emerald-950/30 border border-emerald-500/40 rounded-2xl p-3.5 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2.5">
-            <Cloud className="w-5 h-5 text-emerald-600 shrink-0" />
+            <Cloud className="w-5 h-5 text-emerald-400 shrink-0" />
             <div>
-              <p className="text-xs font-black text-emerald-950">Datos locales encontrados</p>
-              <p className="text-[11px] text-emerald-700">Tienes carreras registradas en este dispositivo. ¿Deseas subirlas a tu cuenta?</p>
+              <p className="text-xs font-black text-[#F4F2ED]">Datos locales encontrados</p>
+              <p className="text-[11px] text-emerald-300">Tienes carreras registradas en este dispositivo. ¿Deseas subirlas a tu cuenta?</p>
             </div>
           </div>
           <button
             onClick={handleSyncLocal}
             disabled={syncing}
-            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs transition-all shrink-0"
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-1.5 rounded-xl text-xs transition-all shrink-0 cursor-pointer"
           >
             {syncing ? 'Subiendo...' : 'Importar a la nube'}
           </button>
         </div>
       )}
 
-      {/* Banner de Periodización Inversa hacia Carrera / Evento Objetivo */}
-      <div className="mb-4 bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-white shadow-sm transition-all">
-        <div
-          className="flex items-center justify-between gap-3 flex-wrap cursor-pointer"
-          onClick={() => setShowPeriodization((v) => !v)}
-        >
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
-              <Target className="w-4 h-4" />
+      {/* BANNER DE PERIODIZACIÓN Y ADAPTACIÓN DEL PLAN */}
+      <div className="mb-5 bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 text-white shadow-xl space-y-4">
+        {/* Cabecera del ciclo */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-[#282F38]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#1FD08A]/15 border border-[#1FD08A]/30 flex items-center justify-center text-[#1FD08A]">
+              <Target className="w-5 h-5" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-black uppercase tracking-wider text-emerald-400">Objetivo de Carrera</span>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A]">
+                  Periodización Adaptativa
+                </span>
                 <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${phaseDetails.badgeColor}`}>
-                  {phaseDetails.phase.toUpperCase()} · SEMANA {phaseDetails.weekNumber}/{phaseDetails.totalWeeks}
+                  {coachGuidance.phaseBadge} · SEMANA {currentWeekNumber}/{targetWeeks}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm font-bold text-zinc-100">{phaseDetails.name}</p>
+              <h3 className="text-sm sm:text-base font-black text-[#F4F2ED] mt-0.5">
+                {coachGuidance.headline}
+              </h3>
             </div>
           </div>
-          <button className="text-zinc-400 hover:text-white p-1" title="Ajustar semanas de preparación">
-            {showPeriodization ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-          </button>
+
+          {/* Stepper intuitivo de semana */}
+          <div className="flex items-center gap-1.5 bg-[#15181D] border border-[#282F38] rounded-2xl p-1.5">
+            <button
+              onClick={() => {
+                const prev = Math.max(1, currentWeekNumber - 1);
+                setWeeksRemaining(targetWeeks - prev + 1);
+              }}
+              disabled={currentWeekNumber <= 1}
+              className="w-7 h-7 rounded-xl bg-[#20252C] hover:bg-[#282F38] disabled:opacity-30 text-[#F4F2ED] font-black text-sm flex items-center justify-center transition-colors cursor-pointer"
+              title="Semana anterior"
+            >
+              -
+            </button>
+            <div className="px-2 text-center">
+              <span className="text-[10px] text-[#A8B0BB] font-bold block uppercase">Semana</span>
+              <span className="text-xs font-mono font-black text-[#1FD08A]">
+                {currentWeekNumber} / {targetWeeks}
+              </span>
+            </div>
+            <button
+              onClick={() => {
+                const next = Math.min(targetWeeks, currentWeekNumber + 1);
+                setWeeksRemaining(targetWeeks - next + 1);
+              }}
+              disabled={currentWeekNumber >= targetWeeks}
+              className="w-7 h-7 rounded-xl bg-[#20252C] hover:bg-[#282F38] disabled:opacity-30 text-[#F4F2ED] font-black text-sm flex items-center justify-center transition-colors cursor-pointer"
+              title="Siguiente semana"
+            >
+              +
+            </button>
+          </div>
         </div>
 
-        {showPeriodization && (
-          <div className="mt-4 pt-3 border-t border-zinc-800 space-y-3 animate-fadeIn text-xs">
-            <p className="text-zinc-300 leading-relaxed text-[11px] sm:text-xs">{phaseDetails.focusDescription}</p>
-            <div className="flex items-center justify-between gap-3 flex-wrap bg-zinc-950/60 p-3 rounded-xl border border-zinc-800">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-zinc-400 font-medium flex items-center gap-1">
-                  <Calendar className="w-3.5 h-3.5" /> Semanas restantes:
-                </span>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setWeeksRemaining((w) => Math.max(1, w - 1)); }}
-                    className="w-6 h-6 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-bold flex items-center justify-center text-xs"
-                  >
-                    -
-                  </button>
-                  <span className="font-mono font-black text-emerald-400 px-1 text-xs">{weeksRemaining} sem</span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setWeeksRemaining((w) => Math.min(targetWeeks, w + 1)); }}
-                    className="w-6 h-6 bg-zinc-800 hover:bg-zinc-700 rounded-lg font-bold flex items-center justify-center text-xs"
-                  >
-                    +
-                  </button>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] text-zinc-400 font-medium">Ciclo total:</span>
-                <div className="flex gap-1">
-                  {[8, 12, 16].map((w) => (
-                    <button
-                      key={w}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setTargetWeeks(w);
-                        if (weeksRemaining > w) setWeeksRemaining(w);
-                      }}
-                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold border transition-colors ${
-                        targetWeeks === w
-                          ? 'bg-emerald-500 border-emerald-500 text-zinc-950 font-black'
-                          : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:border-zinc-500'
-                      }`}
-                    >
-                      {w} sem
-                    </button>
-                  ))}
-                </div>
-              </div>
+        {/* Duración del ciclo y Selector rápido de fase */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-bold text-[#A8B0BB] flex items-center gap-1">
+              <Calendar className="w-3.5 h-3.5 text-[#5B8DEF]" /> Duración ciclo:
+            </span>
+            <div className="flex gap-1.5">
+              {[
+                { w: 8, label: '8 sem (Rápido)' },
+                { w: 12, label: '12 sem (Recomendado)' },
+                { w: 16, label: '16 sem (Completo)' }
+              ].map((item) => (
+                <button
+                  key={item.w}
+                  onClick={() => {
+                    setTargetWeeks(item.w);
+                    if (currentWeekNumber > item.w) {
+                      setWeeksRemaining(1);
+                    } else {
+                      setWeeksRemaining(item.w - currentWeekNumber + 1);
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded-xl text-[10px] font-black transition-all border cursor-pointer ${
+                    targetWeeks === item.w
+                      ? 'bg-[#1FD08A] border-[#1FD08A] text-[#15181D] shadow-sm'
+                      : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED]'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
             </div>
           </div>
-        )}
+
+          {/* Salto directo a fases */}
+          <div className="flex items-center gap-1 flex-wrap">
+            <span className="text-[10px] uppercase font-bold text-zinc-500 mr-1">Ir a fase:</span>
+            {[
+              { id: 'base', name: '1. Base', week: 1 },
+              { id: 'potencia', name: '2. Umbral', week: Math.round(targetWeeks * 0.4) },
+              { id: 'compromised', name: '3. Específico', week: Math.round(targetWeeks * 0.75) },
+              { id: 'tapering', name: '4. Tapering', week: targetWeeks }
+            ].map((p) => {
+              const isActive = phaseDetails.phase === p.id;
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setWeeksRemaining(targetWeeks - p.week + 1)}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all border cursor-pointer ${
+                    isActive
+                      ? 'bg-[#5B8DEF] border-[#5B8DEF] text-white shadow-sm'
+                      : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED]'
+                  }`}
+                >
+                  {p.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Tarjeta de Asesoramiento del Coach Experto */}
+        <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3.5 sm:p-4 space-y-2">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-xs font-black text-[#F4F2ED] flex items-center gap-1.5">
+              <Zap className="w-3.5 h-3.5 text-[#1FD08A]" />
+              Fisiología de la semana: {phaseDetails.name}
+            </p>
+            <div className="flex items-center gap-2 text-[11px]">
+              <span className="text-[#A8B0BB]">Volumen sugerido esta semana:</span>
+              <span className="font-mono font-black text-[#1FD08A] bg-[#1FD08A]/10 border border-[#1FD08A]/20 px-2 py-0.5 rounded-lg">
+                {coachGuidance.weeklyVolumeKm} km totales
+              </span>
+            </div>
+          </div>
+          <p className="text-xs text-zinc-300 leading-relaxed">
+            {coachGuidance.explanation}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-[#282F38] text-[11px] text-[#A8B0BB]">
+            {coachGuidance.coachTips.map((tip, idx) => (
+              <div key={idx} className="flex items-start gap-1.5">
+                <span className="text-[#1FD08A] font-bold shrink-0">•</span>
+                <span className="leading-snug">{tip}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
+      {/* MÉTRICAS DE VOLUMEN DE ESTA SEMANA (DARK THEME) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-        <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5">
-          <p className="text-[10px] uppercase font-black text-zinc-400 tracking-wider">Esta semana</p>
-          <p className="text-xl font-black text-zinc-900">{weekStats.totalKm.toFixed(1)} km</p>
+        <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3.5">
+          <p className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider">Esta semana</p>
+          <p className="text-xl font-black text-[#F4F2ED]">{weekStats.totalKm.toFixed(1)} km</p>
         </div>
-        <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5">
-          <p className="text-[10px] uppercase font-black text-zinc-400 tracking-wider">Sesiones</p>
-          <p className="text-xl font-black text-zinc-900">{weekStats.sessionCount}</p>
+        <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3.5">
+          <p className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider">Sesiones</p>
+          <p className="text-xl font-black text-[#F4F2ED]">{weekStats.sessionCount}</p>
         </div>
-        <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5">
-          <p className="text-[10px] uppercase font-black text-zinc-400 tracking-wider">Fácil</p>
-          <p className="text-xl font-black text-emerald-600">
+        <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3.5">
+          <p className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider">Fácil (Zona 1-2)</p>
+          <p className="text-xl font-black text-[#1FD08A]">
             {weekStats.totalKm === 0 && weekStats.sessionCount === 0 ? '—' : `${weekStats.easyPct}%`}
           </p>
         </div>
-        <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-3.5">
-          <p className="text-[10px] uppercase font-black text-zinc-400 tracking-wider">Moderado-fuerte</p>
-          <p className="text-xl font-black text-amber-600">
+        <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3.5">
+          <p className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider">Moderado-fuerte</p>
+          <p className="text-xl font-black text-[#FB923C]">
             {weekStats.totalKm === 0 && weekStats.sessionCount === 0 ? '—' : `${weekStats.hardPct}%`}
           </p>
         </div>
       </div>
 
       {polarizationFeedback && (
-        <div className="mb-2.5 flex items-start gap-2 bg-blue-50 border border-blue-200/70 rounded-xl px-3 py-2">
-          <TrendingUp className="w-3.5 h-3.5 text-blue-600 mt-0.5 shrink-0" />
-          <p className="text-[11px] text-blue-800 leading-snug">{polarizationFeedback}</p>
+        <div className="mb-2.5 flex items-start gap-2 bg-[#5B8DEF]/10 border border-[#5B8DEF]/30 rounded-xl px-3 py-2 text-[#5B8DEF]">
+          <TrendingUp className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <p className="text-[11px] leading-snug">{polarizationFeedback}</p>
         </div>
       )}
       {volumeFeedback && (
         <div
           className={`mb-4 flex items-start gap-2 rounded-xl px-3 py-2 border ${
             volumeFeedback.level === 'watch'
-              ? 'bg-amber-50 border-amber-200/70'
-              : 'bg-emerald-50 border-emerald-200/70'
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-300'
+              : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
           }`}
         >
           {volumeFeedback.level === 'watch' ? (
-            <AlertTriangle className="w-3.5 h-3.5 text-amber-600 mt-0.5 shrink-0" />
+            <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
           ) : (
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 shrink-0" />
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
           )}
-          <p className={`text-[11px] leading-snug ${volumeFeedback.level === 'watch' ? 'text-amber-800' : 'text-emerald-800'}`}>
+          <p className="text-[11px] leading-snug">
             {volumeFeedback.text}
           </p>
         </div>
       )}
 
       {/* SECCIÓN DEL PLAN DE ENTRENAMIENTO DE CARRERA */}
-      <div className="mb-6 bg-zinc-900 border border-zinc-800 rounded-3xl p-5 text-white shadow-xl">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-zinc-800 pb-4 mb-4">
+      <div className="mb-6 bg-[#20252C] border border-[#282F38] rounded-3xl p-5 text-white shadow-xl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[#282F38] pb-4 mb-4">
           <div>
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider">
                 Plan de Carrera Inteligente
               </span>
-              <span className="text-zinc-400 text-xs font-bold">
+              <span className="text-[#A8B0BB] text-xs font-bold">
                 Meta estimada: {calculateRaceFinishTime(raceDistance, targetPace)}
               </span>
             </div>
-            <h3 className="text-base md:text-lg font-black tracking-tight text-white flex items-center gap-2">
-              <Gauge className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-base md:text-lg font-black tracking-tight text-[#F4F2ED] flex items-center gap-2">
+              <Gauge className="w-5 h-5 text-[#1FD08A]" />
               Estructura Semanal para {raceDistance} a {formatPaceDecimal(targetPace)}
             </h3>
-            <p className="text-zinc-400 text-xs mt-0.5">
-              4 sesiones científicas (80/20) calibradas a tu ritmo objetivo para llegar en pico de forma.
+            <p className="text-[#A8B0BB] text-xs mt-0.5">
+              4 sesiones científicas adaptadas a la <strong className="text-white">{phaseDetails.name}</strong>.
             </p>
           </div>
 
@@ -552,10 +654,10 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
               <button
                 key={d}
                 onClick={() => setRaceDistance(d)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all border cursor-pointer ${
                   raceDistance === d
-                    ? 'bg-emerald-500 border-emerald-500 text-zinc-950 shadow-md'
-                    : 'bg-zinc-800 border-zinc-700 text-zinc-300 hover:text-white'
+                    ? 'bg-[#1FD08A] border-[#1FD08A] text-[#15181D] shadow-md'
+                    : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white'
                 }`}
               >
                 {d}
@@ -565,10 +667,10 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
         </div>
 
         {/* SELECTOR DE RITMO OBJETIVO */}
-        <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-2xl p-3.5 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3.5 mb-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold text-zinc-400">Pace Meta (Ritmo Objetivo):</span>
-            <span className="font-mono font-black text-emerald-400 text-xs md:text-sm bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg">
+            <span className="text-[11px] font-bold text-[#A8B0BB]">Pace Meta (Ritmo Objetivo):</span>
+            <span className="font-mono font-black text-[#1FD08A] text-xs md:text-sm bg-[#1FD08A]/10 border border-[#1FD08A]/20 px-2 py-0.5 rounded-lg">
               {formatPaceDecimal(targetPace)}
             </span>
           </div>
@@ -579,10 +681,10 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
               <button
                 key={p}
                 onClick={() => setTargetPace(p)}
-                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all ${
+                className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${
                   targetPace === p
-                    ? 'bg-purple-600 border-purple-500 text-white font-black'
-                    : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white'
+                    ? 'bg-[#5B8DEF] border-[#5B8DEF] text-white font-black'
+                    : 'bg-[#20252C] border-[#282F38] text-[#A8B0BB] hover:text-white'
                 }`}
               >
                 {formatPaceDecimal(p).replace(' min/km', '')}
@@ -592,7 +694,7 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
         </div>
 
         {/* ZONAS DE RITMO CALCULADAS AUTOMÁTICAMENTE */}
-        <div className="bg-zinc-950/70 border border-zinc-800/80 rounded-2xl p-3.5 mb-4">
+        <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3.5 mb-5">
           <div className="flex items-center justify-between mb-2.5">
             <div className="flex items-center gap-1.5">
               <Zap className="w-3.5 h-3.5 text-amber-400" />
@@ -600,146 +702,211 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
                 Tus 4 Zonas de Ritmo Calculadas
               </span>
             </div>
-            <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+            <span className="text-[10px] text-[#1FD08A] font-bold bg-[#1FD08A]/10 border border-[#1FD08A]/20 px-2 py-0.5 rounded-full">
               Fórmula de Ritmos 80/20
             </span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-left">
-            <div className="bg-zinc-900/80 border border-emerald-900/30 rounded-xl p-2.5">
-              <div className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">1. Suave (80% del tiempo)</div>
+            <div className="bg-[#20252C] border border-[#282F38] rounded-xl p-2.5">
+              <div className="text-[10px] font-black text-[#1FD08A] uppercase tracking-wider">1. Suave (80% del tiempo)</div>
               <div className="text-xs md:text-sm font-black text-white font-mono mt-0.5">{paceZones.easyZone12.max} – {paceZones.easyZone12.min}</div>
-              <p className="text-[10px] text-zinc-400 mt-1 leading-tight">Zonas 1 y 2. Puedes hablar fluidamente sin ahogarte.</p>
+              <p className="text-[10px] text-[#A8B0BB] mt-1 leading-tight">Zona 2. Puedes hablar fluidamente sin ahogarte.</p>
             </div>
-            <div className="bg-zinc-900/80 border border-sky-900/30 rounded-xl p-2.5">
-              <div className="text-[10px] font-black text-sky-400 uppercase tracking-wider">2. Tempo (Alegre)</div>
+            <div className="bg-[#20252C] border border-[#282F38] rounded-xl p-2.5">
+              <div className="text-[10px] font-black text-[#5B8DEF] uppercase tracking-wider">2. Tempo (Alegre)</div>
               <div className="text-xs md:text-sm font-black text-white font-mono mt-0.5">{paceZones.tempoPace.max} – {paceZones.tempoPace.min}</div>
-              <p className="text-[10px] text-zinc-400 mt-1 leading-tight">Ritmo constante que cuesta pero aguantas varios km.</p>
+              <p className="text-[10px] text-[#A8B0BB] mt-1 leading-tight">Ritmo constante que cuesta pero aguantas varios km.</p>
             </div>
-            <div className="bg-zinc-900/80 border border-amber-900/30 rounded-xl p-2.5">
-              <div className="text-[10px] font-black text-amber-400 uppercase tracking-wider">3. Umbral (Exigente)</div>
+            <div className="bg-[#20252C] border border-[#282F38] rounded-xl p-2.5">
+              <div className="text-[10px] font-black text-[#FB923C] uppercase tracking-wider">3. Umbral (Exigente)</div>
               <div className="text-xs md:text-sm font-black text-white font-mono mt-0.5">{paceZones.umbralPace.max} – {paceZones.umbralPace.min}</div>
-              <p className="text-[10px] text-zinc-400 mt-1 leading-tight">Para series de 1k a 2k. Retrasa la sensación de fatiga.</p>
+              <p className="text-[10px] text-[#A8B0BB] mt-1 leading-tight">Para series medias. Retrasa la sensación de fatiga.</p>
             </div>
-            <div className="bg-zinc-900/80 border border-rose-900/30 rounded-xl p-2.5">
-              <div className="text-[10px] font-black text-rose-400 uppercase tracking-wider">4. Velocidad (400m)</div>
+            <div className="bg-[#20252C] border border-[#282F38] rounded-xl p-2.5">
+              <div className="text-[10px] font-black text-rose-400 uppercase tracking-wider">4. Velocidad / VO2</div>
               <div className="text-xs md:text-sm font-black text-white font-mono mt-0.5">{paceZones.sprint400m.min} – {paceZones.sprint400m.max}</div>
-              <p className="text-[10px] text-zinc-400 mt-1 leading-tight">Series cortas explosivas. Estimula tu potencia de zancada.</p>
+              <p className="text-[10px] text-[#A8B0BB] mt-1 leading-tight">Series cortas explosivas para elevar el consumo de O2.</p>
             </div>
           </div>
         </div>
 
-        {/* SESIÓN PRINCIPAL DESTACADA Y LISTA COMPACTA */}
-        {(() => {
-          const nextIndex = plannedSessions.findIndex((s) => !completedPlanIds[s.id]);
-          const currentNext = nextIndex >= 0 ? plannedSessions[nextIndex] : plannedSessions[0];
-          const otherSessions = plannedSessions.filter((s) => s.id !== currentNext.id);
-          const isNextCompleted = Boolean(completedPlanIds[currentNext.id]);
+        {/* SELECTOR DE LAS 4 SESIONES CON LIBERTAD TOTAL DE ELECCIÓN */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <span className="text-xs font-black uppercase tracking-wider text-[#F4F2ED] block">
+                Sesiones de la semana (Elige cuál realizar hoy)
+              </span>
+              <p className="text-[11px] text-[#A8B0BB]">
+                Toca cualquier sesión para ver su estructura completa o realizarla sin importar el orden.
+              </p>
+            </div>
+            <span className="text-[11px] font-bold text-[#1FD08A] bg-[#1FD08A]/10 border border-[#1FD08A]/20 px-2.5 py-0.5 rounded-full">
+              {Object.values(completedPlanIds).filter(Boolean).length} de 4 completadas
+            </span>
+          </div>
 
-          return (
-            <div className="space-y-4">
-              {/* Tarjeta principal destacada de la Siguiente Sesión */}
-              <div className="bg-[#15181D] border-2 border-[#5B8DEF]/60 rounded-3xl p-5 shadow-lg">
-                <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <span className="bg-[#5B8DEF]/20 text-[#5B8DEF] font-black text-[10px] uppercase px-2.5 py-0.5 rounded-full border border-[#5B8DEF]/30">
-                      Siguiente sesión sugerida · {currentNext.dayTitle}
+          {/* Fila de 4 tarjetas/píldoras de sesión */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+            {plannedSessions.map((session, sIdx) => {
+              const isSelected = activeSession.id === session.id;
+              const isCompleted = Boolean(completedPlanIds[session.id]);
+              const num = sIdx + 1;
+
+              return (
+                <button
+                  key={session.id}
+                  onClick={() => setSelectedSessionId(session.id)}
+                  className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative ${
+                    isSelected
+                      ? 'bg-[#5B8DEF]/15 border-[#5B8DEF] ring-2 ring-[#5B8DEF] shadow-lg'
+                      : isCompleted
+                      ? 'bg-[#15181D] border-emerald-500/40 opacity-90'
+                      : 'bg-[#15181D] border-[#282F38] hover:border-[#38414D]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1 mb-1.5">
+                    <span className="text-[10px] font-black uppercase text-[#5B8DEF]">
+                      Sesión {num}
                     </span>
-                    <span className="text-[10px] font-bold text-[#A8B0BB] bg-[#20252C] px-2 py-0.5 rounded-full">
-                      RPE {currentNext.rpe}/10
-                    </span>
+                    {isCompleted ? (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-0.5">
+                        <Check className="w-2.5 h-2.5" /> Hecha
+                      </span>
+                    ) : (
+                      <span className="text-[9px] font-bold text-zinc-500">
+                        Pendiente
+                      </span>
+                    )}
                   </div>
-                  <span className="text-xs font-black text-[#5B8DEF]">{currentNext.distanceKm} km</span>
-                </div>
-
-                <h4 className="text-base font-black text-white">{currentNext.name}</h4>
-                <p className="text-xs text-[#A8B0BB] font-semibold mt-0.5">
-                  Ritmo sugerido: <span className="text-[#1FD08A] font-bold">{currentNext.targetPaceLabel}</span>
-                </p>
-
-                <div className="mt-3 space-y-1.5 border-t border-[#282F38] pt-3">
-                  {currentNext.structure.map((st, i) => (
-                    <p key={i} className="text-xs text-zinc-300 leading-relaxed flex items-start gap-1.5">
-                      <span className="text-[#5B8DEF] font-bold shrink-0">•</span>
-                      <span>{st}</span>
-                    </p>
-                  ))}
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-[#282F38] flex items-center justify-between gap-2 flex-wrap">
-                  <span className="text-[11px] text-[#A8B0BB] italic">{currentNext.focus}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setShowLiveTracker(true)}
-                      className="px-3.5 py-2 bg-[#20252C] hover:bg-[#282F38] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 border border-[#282F38] transition-all cursor-pointer"
-                    >
-                      <Navigation className="w-3.5 h-3.5 text-[#5B8DEF]" />
-                      <span>Grabar con GPS</span>
-                    </button>
-                    <button
-                      onClick={() => handleQuickLogPlannedSession(currentNext)}
-                      className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-md cursor-pointer ${
-                        isNextCompleted
-                          ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-300'
-                          : 'bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D]'
-                      }`}
-                    >
-                      {isNextCompleted ? <Check className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                      <span>{isNextCompleted ? 'Completada ✓' : 'Completar sesión'}</span>
-                    </button>
+                  <p className="text-xs font-bold text-white truncate leading-tight">{session.name}</p>
+                  <div className="flex items-center justify-between mt-1 pt-1 border-t border-[#282F38]/60 text-[10px]">
+                    <span className="font-mono text-[#1FD08A] font-bold">{session.distanceKm} km</span>
+                    <span className="text-[#A8B0BB]">{session.estimatedDurationMin} min</span>
                   </div>
-                </div>
-              </div>
+                </button>
+              );
+            })}
+          </div>
 
-              {/* Otras sesiones en lista compacta */}
-              <div className="space-y-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-[#A8B0BB] block px-1">
-                  Otras sesiones de la semana
+          {/* TARJETA DETALLADA DE LA SESIÓN SELECCIONADA */}
+          <div className="bg-[#15181D] border-2 border-[#5B8DEF]/60 rounded-3xl p-5 shadow-2xl space-y-4 animate-fadeIn">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2">
+                <span className="bg-[#5B8DEF]/20 text-[#5B8DEF] font-black text-[10px] uppercase px-2.5 py-0.5 rounded-full border border-[#5B8DEF]/30">
+                  {activeSession.dayTitle}
                 </span>
-                <div className="grid grid-cols-1 gap-2">
-                  {otherSessions.map((session) => {
-                    const isCompleted = Boolean(completedPlanIds[session.id]);
-                    return (
-                      <div
-                        key={session.id}
-                        className={`p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
-                          isCompleted
-                            ? 'bg-emerald-950/20 border-emerald-500/30'
-                            : 'bg-[#15181D] border-[#282F38] hover:border-[#38414D]'
-                        }`}
-                      >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-[#5B8DEF] uppercase">
-                              {session.dayTitle}
-                            </span>
-                            <span className="text-xs font-bold text-white truncate">
-                              {session.name}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-[#A8B0BB] mt-0.5">
-                            {session.distanceKm} km · {session.targetPaceLabel} · RPE {session.rpe}/10
-                          </p>
-                        </div>
-
-                        <button
-                          onClick={() => handleQuickLogPlannedSession(session)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-all shrink-0 cursor-pointer ${
-                            isCompleted
-                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                              : 'bg-[#20252C] hover:bg-[#282F38] text-white border border-[#282F38]'
-                          }`}
-                        >
-                          {isCompleted ? <Check className="w-3 h-3" /> : <Play className="w-3 h-3 text-[#1FD08A]" />}
-                          <span>{isCompleted ? 'Lista' : 'Registrar'}</span>
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
+                <span className="text-[10px] font-bold text-[#A8B0BB] bg-[#20252C] px-2 py-0.5 rounded-full">
+                  Esfuerzo RPE {activeSession.rpe}/10
+                </span>
+                <span className="text-[10px] font-bold text-[#A8B0BB] bg-[#20252C] px-2 py-0.5 rounded-full">
+                  ~{activeSession.estimatedDurationMin} min
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-mono font-black text-[#1FD08A] bg-[#1FD08A]/10 border border-[#1FD08A]/20 px-2.5 py-0.5 rounded-lg">
+                  {activeSession.distanceKm} km
+                </span>
               </div>
             </div>
-          );
-        })()}
+
+            <div>
+              <h4 className="text-base sm:text-lg font-black text-white">{activeSession.name}</h4>
+              <p className="text-xs text-[#A8B0BB] font-semibold mt-0.5">
+                Ritmo sugerido de referencia: <span className="text-[#1FD08A] font-bold">{activeSession.targetPaceLabel}</span>
+              </p>
+            </div>
+
+            {/* Estructura detallada del entrenamiento */}
+            <div className="space-y-2 border-t border-[#282F38] pt-3">
+              <span className="text-[10px] font-black uppercase text-[#A8B0BB] tracking-wider block">
+                Estructura paso a paso de la sesión:
+              </span>
+              {activeSession.structure.map((st, i) => (
+                <div key={i} className="text-xs text-zinc-300 leading-relaxed flex items-start gap-2 bg-[#20252C]/40 p-2 rounded-xl">
+                  <span className="text-[#5B8DEF] font-bold shrink-0 mt-0.5">•</span>
+                  <span>{st}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Botones de acción directa */}
+            <div className="pt-3 border-t border-[#282F38] flex items-center justify-between gap-3 flex-wrap">
+              <span className="text-[11px] text-[#A8B0BB] italic max-w-sm">
+                💡 {activeSession.focus}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setShowLiveTracker(true)}
+                  className="px-4 py-2.5 bg-[#20252C] hover:bg-[#282F38] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 border border-[#282F38] transition-all cursor-pointer"
+                >
+                  <Navigation className="w-3.5 h-3.5 text-[#5B8DEF]" />
+                  <span>Grabar con GPS</span>
+                </button>
+                <button
+                  onClick={() => handleQuickLogPlannedSession(activeSession)}
+                  className={`px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-md cursor-pointer ${
+                    isActiveCompleted
+                      ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30'
+                      : 'bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D]'
+                  }`}
+                >
+                  {isActiveCompleted ? <Check className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  <span>{isActiveCompleted ? 'Completada ✓ (Toca para desmarcar)' : 'Completar esta sesión'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* VISTA GENERAL COMPLETA DESPLEGABLE (OPCIONAL) */}
+          <div className="pt-2">
+            <button
+              onClick={() => setShowAllSessions(!showAllSessions)}
+              className="text-xs text-[#A8B0BB] hover:text-[#F4F2ED] flex items-center gap-1 cursor-pointer font-bold"
+            >
+              {showAllSessions ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              <span>{showAllSessions ? 'Ocultar vista general de la semana' : 'Ver resumen de las 4 sesiones juntas'}</span>
+            </button>
+
+            {showAllSessions && (
+              <div className="mt-3 space-y-2 animate-fadeIn">
+                {plannedSessions.map((s, idx) => (
+                  <div
+                    key={s.id}
+                    onClick={() => setSelectedSessionId(s.id)}
+                    className="p-3 bg-[#15181D] border border-[#282F38] hover:border-[#5B8DEF] rounded-2xl flex items-center justify-between gap-3 cursor-pointer transition-colors"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-[#5B8DEF]">Sesión {idx + 1}</span>
+                        <span className="text-xs font-bold text-white">{s.name}</span>
+                      </div>
+                      <p className="text-[11px] text-[#A8B0BB] mt-0.5">
+                        {s.distanceKm} km · {s.targetPaceLabel} · {s.focus}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {completedPlanIds[s.id] && (
+                        <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                          Hecha ✓
+                        </span>
+                      )}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSessionId(s.id);
+                        }}
+                        className="px-2.5 py-1 text-[11px] font-bold bg-[#20252C] hover:bg-[#282F38] text-white rounded-lg border border-[#282F38]"
+                      >
+                        Ver detalles
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {showForm && (
