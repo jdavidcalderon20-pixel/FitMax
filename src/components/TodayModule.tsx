@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { Level } from '../types';
 import OnboardingModal, { OnboardingData } from './OnboardingModal';
+import AthleteStatsCard from './AthleteStatsCard';
 
 interface TodayModuleProps {
   nickname: string;
@@ -158,6 +159,12 @@ export default function TodayModule({
           })}
         </div>
       </div>
+
+      {/* MÉTRICAS & ESTADÍSTICAS DEL ATLETA */}
+      <AthleteStatsCard 
+        nickname={nickname} 
+        onNavigateToDiscipline={(d) => onNavigate('train', d)} 
+      />
 
       {/* TARJETA HERO: ONBOARDING SI NO HA COMPLETADO CONFIGURACIÓN */}
       {!isOnboardingDone && (

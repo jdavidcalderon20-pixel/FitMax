@@ -21,8 +21,17 @@ import {
   HeartPulse,
   Info,
   X,
-  Dumbbell
+  Dumbbell,
+  ArrowRightLeft,
+  Layers,
+  PlayCircle
 } from 'lucide-react';
+import { 
+  HYROX_GYM_ALTERNATIVES, 
+  findStationAlternatives, 
+  OCR_CONVENTIONAL_GYM_GUIDE, 
+  StationAlternative 
+} from '../lib/hyroxAlternatives';
 import { HYROX_OFFICIAL_STATIONS, HYROX_WARMUP_H, OCR_WARMUP_O } from '../data/hyroxOcrData';
 import { HyroxLevel, HYROX_LEVELS, HYROX_STATIONS, generateHyroxWeek } from '../lib/hyrox';
 import { OcrLevel, OCR_TIERS, GRIP_TIERS, GripTier, generateOcrWeek } from '../lib/ocr';
@@ -85,6 +94,41 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
   const [lastAdjustment, setLastAdjustment] = useState<AutoregulationAdjustment | null>(null);
   const [inspectedExercise, setInspectedExercise] = useState<ExerciseDetail | null>(null);
   const [showRoundGuide, setShowRoundGuide] = useState<boolean>(false);
+
+  // Alternativas seleccionadas por el usuario para gimnasios sin maquinaria oficial Hyrox
+  const [selectedAlternatives, setSelectedAlternatives] = useState<Record<string, StationAlternative>>(() => {
+    try {
+      const saved = localStorage.getItem(`fitmax_hyrox_alts_${nickname}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [activeSwapStation, setActiveSwapStation] = useState<{
+    stationName: string;
+    blockKey: string;
+  } | null>(null);
+
+  // Guía OCR desplegable
+  const [showOcrGymGuide, setShowOcrGymGuide] = useState(false);
+
+  // Guardar alternativas en localStorage
+  const handleSelectAlternative = (stationName: string, alt: StationAlternative | null) => {
+    setSelectedAlternatives((prev) => {
+      const next = { ...prev };
+      if (!alt) {
+        delete next[stationName];
+      } else {
+        next[stationName] = alt;
+      }
+      try {
+        localStorage.setItem(`fitmax_hyrox_alts_${nickname}`, JSON.stringify(next));
+      } catch (e) {}
+      return next;
+    });
+    setActiveSwapStation(null);
+  };
 
   // Cargar estado inicial y persistencia
   useEffect(() => {
@@ -531,87 +575,192 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
             <p className="text-xs text-zinc-300">{session.warmup}</p>
           </div>
 
-          {/* GUÍA DE FORMATO DE RONDAS (PLEGABLE CON ?) */}
-          <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3">
-            <button
-              onClick={() => setShowRoundGuide(!showRoundGuide)}
-              className="w-full flex items-center justify-between text-left cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Info className="w-4 h-4 text-[#C084FC]" />
-                <span className="text-xs font-bold text-[#F4F2ED]">¿Cómo funcionan las rondas en circuito?</span>
+          {/* GUÍA DE ADAPTACIONES GYM CONVENCIONAL & FORMATO */}
+          <div className="space-y-2">
+            {discipline === 'hyrox' ? (
+              <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3 flex items-start gap-2.5">
+                <span className="text-base shrink-0 mt-0.5">💡</span>
+                <div className="flex-1 text-xs">
+                  <p className="font-bold text-[#F4F2ED]">¿Tu gimnasio no tiene trineo o SkiErg?</p>
+                  <p className="text-[#A8B0BB] mt-0.5 leading-relaxed">
+                    Toca el botón <strong className="text-purple-300">"Alternativas gym"</strong> en cualquier estación para cambiarla por opciones con mancuernas, polea o empuje de disco en suelo.
+                  </p>
+                </div>
               </div>
-              <span className="text-[11px] text-[#A8B0BB] font-semibold">{showRoundGuide ? 'Plegar' : 'Ver ?'}</span>
-            </button>
-            {showRoundGuide && (
-              <p className="text-xs text-[#A8B0BB] mt-2 pt-2 border-t border-[#282F38] leading-relaxed animate-fadeIn">
-                Se entrena en <strong>circuito continuo</strong>: haz 1 ronda del Bloque 1 → luego Bloque 2 → Bloque 3 hasta completar toda la lista (= <strong>1 ronda completada</strong>). Descansas 90-120 s y repites desde el inicio hasta completar el total de rondas. ¡Toca el nombre de cualquier ejercicio para ver su técnica paso a paso!
-              </p>
+            ) : (
+              <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3">
+                <button
+                  onClick={() => setShowOcrGymGuide(!showOcrGymGuide)}
+                  className="w-full flex items-center justify-between text-left cursor-pointer"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">🛠️</span>
+                    <span className="text-xs font-bold text-[#F4F2ED]">
+                      ¿Cómo entrenar OCR en un gimnasio convencional?
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-purple-400 font-bold">
+                    {showOcrGymGuide ? 'Plegar' : 'Ver trucos'}
+                  </span>
+                </button>
+                {showOcrGymGuide && (
+                  <div className="mt-3 pt-3 border-t border-[#282F38] space-y-2.5 animate-fadeIn">
+                    {OCR_CONVENTIONAL_GYM_GUIDE.map((guide, gIdx) => (
+                      <div key={gIdx} className="bg-[#15181D] p-2.5 rounded-xl border border-[#282F38] space-y-1">
+                        <p className="text-xs font-black text-emerald-400">{guide.title}</p>
+                        <p className="text-[11px] text-[#F4F2ED]">{guide.howToInNormalGym}</p>
+                        <p className="text-[10px] text-amber-300 font-semibold">💡 {guide.secretTrick}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
+
+            {/* GUÍA DE RONDAS */}
+            <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3">
+              <button
+                onClick={() => setShowRoundGuide(!showRoundGuide)}
+                className="w-full flex items-center justify-between text-left cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Info className="w-4 h-4 text-[#C084FC]" />
+                  <span className="text-xs font-bold text-[#F4F2ED]">¿Cómo estructurar las rondas de hoy?</span>
+                </div>
+                <span className="text-[11px] text-[#A8B0BB] font-semibold">{showRoundGuide ? 'Plegar' : 'Ver ?'}</span>
+              </button>
+              {showRoundGuide && (
+                <p className="text-xs text-[#A8B0BB] mt-2 pt-2 border-t border-[#282F38] leading-relaxed animate-fadeIn">
+                  Se entrena en <strong>circuito continuo</strong>: haz 1 ronda del Bloque 1 → luego Bloque 2 → Bloque 3 hasta completar toda la lista (= <strong>1 ronda completada</strong>). Descansas 90-120 s y repites desde el inicio hasta completar el total de rondas. ¡Toca el nombre de cualquier ejercicio para ver su técnica paso a paso!
+                </p>
+              )}
+            </div>
           </div>
 
-          {/* CHECKLIST DE BLOQUES CON TARGETS GRANDES */}
-          <div className="space-y-2">
+          {/* CHECKLIST DE BLOQUES CON TARGETS GRANDES & ADAPTACIONES */}
+          <div className="space-y-2.5">
             {session.blocks.map((b, i) => {
               const blockKey = `${dayKey}_block${i}`;
               const isChecked = Boolean(completedBlocks[blockKey]);
+              const altInfo = findStationAlternatives(b.name);
+              const activeAlt = selectedAlternatives[b.name];
+
               return (
                 <div
                   key={i}
-                  onClick={() => handleBlockToggle(i)}
-                  className={`flex items-start gap-3 p-3.5 rounded-2xl border transition-all cursor-pointer select-none ${
+                  className={`p-3.5 rounded-2xl border transition-all ${
                     isChecked
-                      ? 'bg-emerald-50/50 border-emerald-300 shadow-sm'
+                      ? 'bg-emerald-950/20 border-emerald-500/40 shadow-sm'
                       : b.isCompromised
-                      ? 'bg-purple-50/30 border-purple-200 hover:border-purple-300'
-                      : 'bg-white border-zinc-200 hover:border-zinc-300'
+                      ? 'bg-[#20252C] border-purple-500/40'
+                      : 'bg-[#20252C] border-[#282F38]'
                   }`}
                 >
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 transition-all ${
-                    isChecked 
-                  ? 'bg-emerald-500 text-zinc-950' 
-                  : b.isCompromised
-                  ? 'bg-purple-100 text-purple-700'
-                  : 'bg-zinc-100 text-zinc-700'
-                  }`}>
-                    {isChecked ? <CheckCircle2 className="w-5 h-5" /> : i + 1}
-                  </div>
+                  <div className="flex items-start gap-3">
+                    <div 
+                      onClick={() => handleBlockToggle(i)}
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs shrink-0 transition-all cursor-pointer select-none ${
+                        isChecked 
+                          ? 'bg-[#1FD08A] text-[#15181D]' 
+                          : b.isCompromised
+                          ? 'bg-purple-900/40 text-purple-300 border border-purple-500/30'
+                          : 'bg-[#15181D] text-[#A8B0BB] border border-[#282F38]'
+                      }`}
+                    >
+                      {isChecked ? <CheckCircle2 className="w-5 h-5 stroke-[2.5]" /> : i + 1}
+                    </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <div
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setInspectedExercise(findExerciseDetail(b.name));
-                        }}
-                        className="flex items-center gap-1 cursor-pointer group/name hover:underline"
-                        title="Toca para ver técnica y ejecución"
-                      >
-                        <p className={`font-extrabold text-sm group-hover/name:text-emerald-600 transition-colors ${isChecked ? 'line-through text-zinc-400' : 'text-zinc-900'}`}>
-                          {b.name}
-                        </p>
-                        <Info className="w-3.5 h-3.5 text-zinc-400 group-hover/name:text-emerald-600 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Nombre del ejercicio o alternativa */}
+                        <div
+                          onClick={() => setInspectedExercise(findExerciseDetail(activeAlt ? activeAlt.name : b.name))}
+                          className="flex items-center gap-1 cursor-pointer group/name hover:underline"
+                          title="Toca para ver técnica y ejecución"
+                        >
+                          <p className={`font-extrabold text-sm group-hover/name:text-[#1FD08A] transition-colors ${isChecked ? 'line-through text-[#A8B0BB]' : 'text-[#F4F2ED]'}`}>
+                            {activeAlt ? activeAlt.name : b.name}
+                          </p>
+                          <Info className="w-3.5 h-3.5 text-[#A8B0BB] group-hover/name:text-[#1FD08A] shrink-0" />
+                        </div>
+
+                        {activeAlt && (
+                          <span className="text-[9px] bg-purple-500/20 text-purple-300 font-bold px-1.5 py-0.5 rounded border border-purple-500/30">
+                            Alt Gym: {activeAlt.equipment}
+                          </span>
+                        )}
+
+                        {b.isCompromised && (
+                          <span className="text-[9px] bg-purple-600 text-white font-black px-1.5 py-0.5 rounded uppercase">
+                            Compromised Run
+                          </span>
+                        )}
+                        {b.isGripSpecific && (
+                          <span className="text-[9px] bg-amber-500 text-zinc-950 font-black px-1.5 py-0.5 rounded uppercase">
+                            Fuerza de Agarre
+                          </span>
+                        )}
                       </div>
-                      {b.isCompromised && (
-                        <span className="text-[9px] bg-purple-600 text-white font-black px-1.5 py-0.5 rounded uppercase">
-                          Compromised Run
-                        </span>
+
+                      {/* Detalle o fórmula de conversión */}
+                      <p className="text-xs text-[#A8B0BB] mt-1 leading-relaxed">
+                        {activeAlt ? activeAlt.conversionFormula : b.detail}
+                      </p>
+
+                      {/* Botón para cambiar por alternativa gym o restaurar */}
+                      {altInfo && (
+                        <div className="mt-2.5 pt-2 border-t border-[#282F38]/60 flex items-center justify-between gap-2 flex-wrap">
+                          {activeAlt ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-purple-300 font-semibold">
+                                ✓ Adaptado a gym convencional
+                              </span>
+                              <button
+                                onClick={() => handleSelectAlternative(b.name, null)}
+                                className="text-[10px] text-[#A8B0BB] hover:text-[#F4F2ED] underline cursor-pointer"
+                              >
+                                Volver a oficial ({b.name})
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setActiveSwapStation({ stationName: b.name, blockKey })}
+                              className="inline-flex items-center gap-1.5 bg-[#15181D] hover:bg-[#282F38] text-purple-300 text-[11px] font-bold px-2.5 py-1 rounded-lg border border-purple-500/30 transition-all cursor-pointer active:scale-95"
+                            >
+                              <ArrowRightLeft className="w-3 h-3 text-purple-400" />
+                              <span>¿Sin esta máquina? Ver alternativas gym</span>
+                            </button>
+                          )}
+                        </div>
                       )}
-                      {b.isGripSpecific && (
-                        <span className="text-[9px] bg-amber-500 text-zinc-950 font-black px-1.5 py-0.5 rounded uppercase">
-                          Fuerza de Agarre
-                        </span>
+
+                      {/* En OCR: Botón táctil para iniciar suspensión */}
+                      {discipline === 'ocr' && b.isGripSpecific && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <button
+                            onClick={() => startCountdown(30, `Colgado: ${b.name}`)}
+                            className="inline-flex items-center gap-1.5 bg-[#15181D] hover:bg-[#282F38] text-amber-400 text-[11px] font-bold px-2.5 py-1 rounded-lg border border-amber-500/30 transition-all cursor-pointer active:scale-95"
+                          >
+                            <Timer className="w-3 h-3 text-amber-400" />
+                            <span>⏱️ Suspenderse ahora (30s)</span>
+                          </button>
+                          <button
+                            onClick={() => startCountdown(45, `Colgado: ${b.name}`)}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-[#A8B0BB] hover:text-[#F4F2ED] px-2 py-1 bg-[#15181D] rounded-lg border border-[#282F38] cursor-pointer"
+                          >
+                            <span>45s</span>
+                          </button>
+                        </div>
                       )}
                     </div>
-                    <p className="text-xs text-zinc-600 mt-0.5">{b.detail}</p>
                   </div>
                 </div>
               );
             })}
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3">
-            <p className="text-xs text-blue-900 leading-snug font-medium">
+          <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3">
+            <p className="text-xs text-[#5B8DEF] leading-snug font-medium">
               🏃 {session.runningNote}
             </p>
           </div>
@@ -924,6 +1073,132 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
               <button
                 onClick={() => setShowReference(false)}
                 className="px-5 py-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs transition-colors"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE SUSTITUCIÓN: ALTERNATIVAS PARA GIMNASIO CONVENCIONAL */}
+      {activeSwapStation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn">
+          <div className="bg-[#15181D] border border-[#282F38] text-[#F4F2ED] rounded-3xl p-5 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#20252C] pb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 flex items-center justify-center">
+                  <ArrowRightLeft className="w-4 h-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-black text-[#F4F2ED]">
+                    Alternativas para {activeSwapStation.stationName}
+                  </h3>
+                  <p className="text-[11px] text-[#A8B0BB]">
+                    Adaptado si tu gym no cuenta con la máquina reglamentaria
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setActiveSwapStation(null)}
+                className="w-8 h-8 rounded-xl bg-[#20252C] hover:bg-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED] flex items-center justify-center transition-all cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Estación oficial y alternativas */}
+            {(() => {
+              const info = findStationAlternatives(activeSwapStation.stationName);
+              if (!info) {
+                return (
+                  <p className="text-xs text-[#A8B0BB]">
+                    No se encontraron alternativas automáticas para esta estación.
+                  </p>
+                );
+              }
+
+              return (
+                <div className="space-y-3">
+                  <div className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3 text-xs space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-[#A8B0BB]">Estación Oficial Hyrox:</p>
+                    <p className="font-extrabold text-[#F4F2ED]">{info.officialName}</p>
+                    <p className="text-[#A8B0BB]">{info.officialSpec} · Equipo: {info.officialEquipment}</p>
+                  </div>
+
+                  <p className="text-xs font-black uppercase text-purple-300 tracking-wider pt-1">
+                    Elige la alternativa según lo que tengas en tu gimnasio:
+                  </p>
+
+                  <div className="space-y-3">
+                    {info.alternatives.map((alt) => {
+                      const isCurrentlySelected = selectedAlternatives[activeSwapStation.stationName]?.id === alt.id;
+                      return (
+                        <div 
+                          key={alt.id}
+                          className={`bg-[#20252C] border rounded-2xl p-3.5 space-y-2 transition-all ${
+                            isCurrentlySelected ? 'border-purple-500 bg-purple-950/20' : 'border-[#282F38] hover:border-purple-500/40'
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <h4 className="font-extrabold text-sm text-[#F4F2ED]">{alt.name}</h4>
+                              <span className="inline-block mt-0.5 text-[10px] font-bold bg-[#15181D] text-purple-300 px-2 py-0.5 rounded border border-purple-500/30">
+                                Equipo: {alt.equipment}
+                              </span>
+                            </div>
+
+                            <button
+                              onClick={() => handleSelectAlternative(activeSwapStation.stationName, alt)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                isCurrentlySelected
+                                  ? 'bg-purple-600 text-white shadow-md'
+                                  : 'bg-[#15181D] hover:bg-purple-600 hover:text-white text-purple-300 border border-purple-500/30'
+                              }`}
+                            >
+                              {isCurrentlySelected ? '✓ Seleccionada' : 'Usar esta'}
+                            </button>
+                          </div>
+
+                          <div className="bg-[#15181D] p-2 rounded-xl text-xs space-y-1 border border-[#282F38]/60">
+                            <p className="text-[11px] text-[#1FD08A] font-semibold">
+                              🎯 <strong className="text-[#F4F2ED]">Equivalencia:</strong> {alt.conversionFormula}
+                            </p>
+                            <p className="text-[11px] text-[#A8B0BB] leading-snug">
+                              💡 {alt.whyItWorks}
+                            </p>
+                          </div>
+
+                          <div className="space-y-1">
+                            <p className="text-[10px] font-bold uppercase text-[#A8B0BB]">Pautas de ejecución:</p>
+                            <ul className="text-[11px] text-[#F4F2ED]/90 list-disc list-inside space-y-0.5">
+                              {alt.executionTips.map((tip, tIdx) => (
+                                <li key={tIdx}>{tip}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {selectedAlternatives[activeSwapStation.stationName] && (
+                    <button
+                      onClick={() => handleSelectAlternative(activeSwapStation.stationName, null)}
+                      className="w-full text-center py-2 text-xs text-[#A8B0BB] hover:text-[#F4F2ED] underline cursor-pointer"
+                    >
+                      Restaurar estación oficial Hyrox
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
+
+            <div className="pt-2 border-t border-[#20252C] flex justify-end">
+              <button
+                onClick={() => setActiveSwapStation(null)}
+                className="px-4 py-2 rounded-xl bg-[#20252C] hover:bg-[#282F38] text-[#F4F2ED] font-bold text-xs cursor-pointer"
               >
                 Cerrar
               </button>
