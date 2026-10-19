@@ -45,5 +45,19 @@ describe('generateOcrWeek', () => {
     expect(baseGrip.blocks.some((b) => b.name.includes('Dead Hang Pasivo'))).toBe(true);
     expect(advGrip.blocks.some((b) => b.name.includes('1 Mano Asistida') || b.name.includes('Pinch Grip'))).toBe(true);
   });
+
+  it('cada sesión incluye una guía de estructura detallada (structureGuide)', () => {
+    generateOcrWeek('super').forEach((session) => {
+      expect(session.structureGuide).toBeTruthy();
+      expect(session.structureGuide?.length).toBeGreaterThan(20);
+    });
+  });
+
+  it('el Día 2 de OCR especifica claramente el protocolo secuencial (primero 5km, luego cuestas)', () => {
+    const dia2 = generateOcrWeek('super')[1];
+    expect(dia2.structureGuide).toContain('Protocolo Secuencial');
+    expect(dia2.structureGuide).toContain('Primero realiza el Bloque 1');
+    expect(dia2.structureGuide).toContain('cuestas cortas explosivas');
+  });
 });
 

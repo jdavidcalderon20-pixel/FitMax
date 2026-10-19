@@ -31,6 +31,7 @@ export interface OcrSession {
   blocks: OcrBlock[];
   runningNote: string;
   isCompromisedDay?: boolean;
+  structureGuide?: string;
 }
 
 const OCR_SCALE: Record<OcrLevel, { sets: number; hangSec: number; runKm: number }> = {
@@ -50,7 +51,7 @@ export const generateOcrWeek = (
   // Ajuste según fase de periodización inversa
   const setsMultiplier = phase === 'tapering' ? 0.6 : phase === 'potencia' ? 1.2 : 1.0;
   const sets = Math.max(2, Math.round(baseScale.sets * setsMultiplier));
-  const runKm = phase === 'tapering' ? baseScale.runKm * 0.6 : baseScale.runKm;
+  const runKm = phase === 'tapering' ? Math.round(baseScale.runKm * 0.6) : baseScale.runKm;
 
   // Bloques de agarre según nivel seleccionado
   const gripBlocks: OcrBlock[] = gripTier === 'base'
@@ -80,6 +81,7 @@ export const generateOcrWeek = (
       warmup: '5-10 min movilidad de hombro, muñecas y estiramiento de flexores de antebrazo',
       blocks: gripBlocks,
       runningNote: 'Cierra con 2-3km de trote suave para descongestionar los antebrazos y recuperar el tren superior.',
+      structureGuide: 'Protocolo de Agarre en Circuito: Realiza 1 serie de cada ejercicio de suspensión y tracción (Bloques 1 al 4) de forma secuencial. Descansa de 60 a 90 segundos entre ejercicios para disipar el lactato de antebrazos. Al completar la vuelta descansas 2 minutos y repites hasta completar las series totales.',
     },
     {
       title: 'Día 2 · Trail Running y Desnivel',
@@ -90,6 +92,7 @@ export const generateOcrWeek = (
         { name: 'Cuestas cortas explosivas', detail: `${sets} repeticiones de 20-30s cuesta arriba a RPE 8-9, bajada caminando` },
       ],
       runningNote: 'El desnivel fortalece tobillos, tendón de Aquiles y prepara las piernas para los descensos de carrera.',
+      structureGuide: `Protocolo Secuencial (No es circuito continuo): Primero realiza el Bloque 1 completo (los ${runKm} km de carrera continua a ritmo Z2 aeróbico en senderos o caminadora). Al terminar los ${runKm} km, tómate 2-3 minutos de recuperación suave e inicia el Bloque 2: realiza las ${sets} repeticiones de cuestas cortas explosivas (20-30s a RPE 8-9) bajando caminando lento para recuperar antes de la siguiente repetición.`,
     },
     {
       title: 'Día 3 · Cargas Pesadas y Arrastres',
@@ -101,6 +104,7 @@ export const generateOcrWeek = (
         { name: 'Bear Crawl (Paso de oso bajo)', detail: `${sets} rondas de 20m manteniendo rodillas a 2cm del piso` },
       ],
       runningNote: 'Alterna cada carga con 200m-400m de trote para acostumbrar la zancada a la fatiga previa.',
+      structureGuide: 'Protocolo de Cargas Metabólicas: Realiza cada bloque como estación independiente o en circuito con 90s de descanso entre cargas. Si alternas con trote, completa la carga (saco/trineo) y sal de inmediato a trotar 200-400m para acostumbrar la zancada al peso previo.',
     },
     {
       title: 'Día 4 · Circuito de Obstáculos y Penalización',
@@ -111,6 +115,7 @@ export const generateOcrWeek = (
         { name: 'Circuito mixto de obstáculos', detail: `${sets} rondas: 300m carrera + 10 burpees + 15 saltos al cajón / zancadas de salto` },
       ],
       runningNote: `Cierra con ${Math.round(runKm * 0.5)}km a ritmo de carrera para simular el tramo final hacia la meta.`,
+      structureGuide: 'Protocolo de Simulación OCR: Realiza los bloques en orden continuo simulando los castigos reales de carrera. En el circuito mixto mantén un ritmo de carrera sostenido y ataca los burpees con cadencia continua sin detenerte.',
     },
   ];
 };
