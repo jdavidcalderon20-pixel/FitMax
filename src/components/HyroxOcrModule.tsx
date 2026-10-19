@@ -494,7 +494,9 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
             <Timer className={`w-5 h-5 ${timerRunning ? 'animate-spin' : ''}`} />
           </div>
           <div>
-            <p className="text-[10px] uppercase font-black tracking-wider text-purple-400">{timerLabel}</p>
+            <p className="text-[10px] uppercase font-black tracking-wider text-purple-400">
+              {discipline === 'ocr' ? timerLabel : (timerLabel.includes('Colgado') ? 'Descanso' : timerLabel)}
+            </p>
             <p className="text-2xl font-black font-mono tabular-nums leading-none mt-0.5">
               {timerSeconds > 0 ? `${timerSeconds}s` : 'Listo'}
             </p>
@@ -502,18 +504,23 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] font-bold text-[#A8B0BB] mr-1 hidden sm:inline">Colgado:</span>
-          {[20, 30, 45, 60].map((sec) => (
-            <button
-              key={sec}
-              onClick={() => startCountdown(sec, `Colgado en barra ${sec} s`)}
-              className="bg-[#20252C] hover:bg-[#282F38] text-[#F4F2ED] font-bold px-2.5 py-1.5 rounded-lg text-xs border border-[#282F38] cursor-pointer"
-            >
-              Colgado {sec}s
-            </button>
-          ))}
+          {discipline === 'ocr' && (
+            <>
+              <span className="text-[10px] font-bold text-[#A8B0BB] mr-1 hidden sm:inline">Colgado:</span>
+              {[20, 30, 45, 60].map((sec) => (
+                <button
+                  key={sec}
+                  onClick={() => startCountdown(sec, `Colgado en barra ${sec} s`)}
+                  className="bg-[#20252C] hover:bg-[#282F38] text-[#F4F2ED] font-bold px-2.5 py-1.5 rounded-lg text-xs border border-[#282F38] cursor-pointer"
+                >
+                  Colgado {sec}s
+                </button>
+              ))}
+            </>
+          )}
+
           <span className="text-[10px] font-bold text-[#A8B0BB] mx-1 hidden sm:inline">Descanso:</span>
-          {[60, 90, 120].map((sec) => (
+          {[30, 60, 90, 120].map((sec) => (
             <button
               key={sec}
               onClick={() => startCountdown(sec, `Descanso +${sec} s`)}
@@ -630,9 +637,20 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
                 <span className="text-[11px] text-[#A8B0BB] font-semibold">{showRoundGuide ? 'Plegar' : 'Ver ?'}</span>
               </button>
               {showRoundGuide && (
-                <p className="text-xs text-[#A8B0BB] mt-2 pt-2 border-t border-[#282F38] leading-relaxed animate-fadeIn">
-                  Se entrena en <strong>circuito continuo</strong>: haz 1 ronda del Bloque 1 → luego Bloque 2 → Bloque 3 hasta completar toda la lista (= <strong>1 ronda completada</strong>). Descansas 90-120 s y repites desde el inicio hasta completar el total de rondas. ¡Toca el nombre de cualquier ejercicio para ver su técnica paso a paso!
-                </p>
+                <div className="text-xs text-[#F4F2ED] mt-2 pt-2 border-t border-[#282F38] leading-relaxed animate-fadeIn space-y-2">
+                  <div className="bg-[#15181D] p-3 rounded-xl border border-[#282F38] space-y-1">
+                    <p className="text-[11px] font-black uppercase text-[#1FD08A] tracking-wider">
+                      📋 Protocolo de Entrenamiento para Hoy:
+                    </p>
+                    <p className="text-xs text-[#F4F2ED] leading-relaxed">
+                      {(session as any).structureGuide || (
+                        discipline === 'ocr'
+                          ? 'Circuito de obstáculos y suspensión: realiza 1 serie de cada bloque en orden continuo. Al terminar la vuelta descansas 90-120 s y repites hasta completar las rondas totales.'
+                          : 'Realiza las rondas indicadas en cada bloque respetando los descansos sugeridos entre estaciones.'
+                      )}
+                    </p>
+                  </div>
+                </div>
               )}
             </div>
           </div>
