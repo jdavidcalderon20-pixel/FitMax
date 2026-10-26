@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Dumbbell, Flame, Footprints, Mountain, Zap, Calendar, ChevronDown, Check, Info } from 'lucide-react';
+import { Dumbbell, Flame, Footprints, Mountain, Zap, Calendar, ChevronDown, Check, Info, Sparkles } from 'lucide-react';
 import { Level, LEVELS } from '../types';
 import WeeklyModule from './WeeklyModule';
 import QuickModule from './QuickModule';
+import CustomRoutineModule from './CustomRoutineModule';
 import HiitModule from './HiitModule';
 import RunningModule from './RunningModule';
 import HyroxOcrModule from './HyroxOcrModule';
@@ -25,7 +26,7 @@ export default function TrainModule({
   initialDiscipline = 'gym'
 }: TrainModuleProps) {
   const [activeDiscipline, setActiveDiscipline] = useState<DisciplineType>(initialDiscipline);
-  const [gymMode, setGymMode] = useState<'weekly' | 'quick'>('weekly');
+  const [gymMode, setGymMode] = useState<'weekly' | 'quick' | 'custom'>('weekly');
   const [showLevelSheet, setShowLevelSheet] = useState<boolean>(false);
 
   const currentLevelObj = LEVELS.find((l) => l.id === selectedLevel) || LEVELS[0];
@@ -57,7 +58,7 @@ export default function TrainModule({
     },
     {
       id: 'hyrox' as const,
-      name: 'Hyrox y OCR',
+      name: 'Hyrox',
       icon: Mountain,
       color: 'text-purple-400',
       activeBg: 'bg-purple-500/15 border-purple-500 text-purple-300',
@@ -116,6 +117,17 @@ export default function TrainModule({
             >
               <Zap className="w-3.5 h-3.5" />
               <span>Rutina rápida</span>
+            </button>
+            <button
+              onClick={() => setGymMode('custom')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                gymMode === 'custom'
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-zinc-400 hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Rutina personalizada</span>
             </button>
           </div>
 
@@ -188,8 +200,14 @@ export default function TrainModule({
               selectedLevel={selectedLevel}
               onNotification={onNotification}
             />
-          ) : (
+          ) : gymMode === 'quick' ? (
             <QuickModule
+              nickname={nickname}
+              selectedLevel={selectedLevel}
+              onNotification={onNotification}
+            />
+          ) : (
+            <CustomRoutineModule
               nickname={nickname}
               selectedLevel={selectedLevel}
               onNotification={onNotification}

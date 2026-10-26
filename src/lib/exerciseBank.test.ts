@@ -84,7 +84,7 @@ describe('findExerciseDetail - Verificación estricta de técnica y fotos reales
     // Remo Pendlay debe ser con barra desde el piso (dead stop a 90 grados)
     expect(pendlay.muscleGroup).toBe('Espalda');
     expect(pendlay.demoImages).toBeDefined();
-    expect(pendlay.demoImages?.[0]).toContain('Barbell_Rear_Delt_Row');
+    expect(pendlay.demoImages?.[0]).toContain('Bent_Over_Barbell_Row');
     expect(pendlay.steps.some((s) => /dead stop|suelo|horizontal|piso|90°|90 grados/i.test(s))).toBe(true);
 
     // Las referencias de imagen NO deben ser iguales entre Meadows y Pendlay
@@ -167,8 +167,8 @@ describe('findExerciseDetail - Verificación estricta de técnica y fotos reales
       { name: 'Abducción de cadera en máquina (Glúteo Medio)', image: 'Thigh_Abductor', group: 'Glúteos' },
       { name: 'Extensiones de tríceps en polea con cuerda', image: 'Triceps_Pushdown_-_Rope_Attachment', group: 'Brazos' },
       { name: 'Press de banca con pausa de 2s abajo', image: 'Barbell_Bench_Press_-_Medium_Grip', group: 'Pecho' },
-      { name: 'Sentadilla copa (Goblet Squat)', image: 'Goblet_Squat', group: 'Cuádriceps' },
-      { name: 'Sentadilla trasera con barra (Back Squat)', image: 'Barbell_Full_Squat', group: 'Cuádriceps' },
+      { name: 'Sentadilla copa (Goblet Squat)', image: 'Dumbbell_Squat', group: 'Cuádriceps' },
+      { name: 'Sentadilla trasera con barra (Back Squat)', image: 'Box_Squat', group: 'Cuádriceps' },
       { name: 'Sentadilla frontal con barra (Front Squat)', image: 'Front_Barbell_Squat', group: 'Cuádriceps' },
       { name: 'Extensiones de cuádriceps en máquina', image: 'Leg_Extensions', group: 'Cuádriceps' },
       { name: 'Sentadilla sissy (inclinando el cuerpo hacia atrás)', image: 'Weighted_Sissy_Squat', group: 'Cuádriceps' },
@@ -176,7 +176,7 @@ describe('findExerciseDetail - Verificación estricta de técnica y fotos reales
       { name: 'Empuje de cadera con barra y pausa', image: 'Barbell_Hip_Thrust', group: 'Glúteos' },
       { name: 'Patada de glúteo en polea a 30° (Cable Kickback)', image: 'One-Legged_Cable_Kickback', group: 'Glúteos' },
       { name: 'Elevación de talones sentado en máquina', image: 'Seated_Calf_Raise', group: 'Isquios y Glúteo' },
-      { name: 'Remo Pendlay (remo desde el suelo)', image: 'Barbell_Rear_Delt_Row', group: 'Espalda' },
+      { name: 'Remo Pendlay (remo desde el suelo)', image: 'Bent_Over_Barbell_Row', group: 'Espalda' },
       { name: 'Remo en barra T', image: 'Lying_T-Bar_Row', group: 'Espalda' },
       { name: 'Press militar con barra de pie (Overhead Press)', image: 'Standing_Military_Press', group: 'Hombros' },
       { name: 'SkiErg (máquina de esquí)', image: 'Rope_Straight-Arm_Pulldown', group: 'Cardio y Metabólico' },

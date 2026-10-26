@@ -388,11 +388,11 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
       <div className="flex items-start justify-between mb-4 gap-3 flex-wrap">
         <div>
           <h2 className="text-xl md:text-2xl font-black tracking-tight text-[#F4F2ED] flex items-center gap-2.5">
-            <Mountain className="w-6 h-6 text-emerald-500" />
-            Hyrox &amp; OCR
+            <Mountain className="w-6 h-6 text-purple-400" />
+            Hyrox Training
           </h2>
           <p className="text-[#A8B0BB] text-xs mt-0.5">
-            Compromised running, fuerza de agarre y periodización inversa para eventos
+            Compromised running, simulador oficial de carrera y periodización hacia tu evento
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -525,71 +525,23 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
         )}
       </div>
 
-      {/* SELECTOR DE DISCIPLINA */}
-      <div className="grid grid-cols-2 gap-2 mb-4 bg-[#20252C] border border-[#282F38] p-1.5 rounded-2xl">
-        <button
-          onClick={() => { setDiscipline('hyrox'); setActiveDay(0); }}
-          className={`py-2.5 rounded-xl text-sm font-black transition-all cursor-pointer ${discipline === 'hyrox' ? 'bg-[#C084FC] text-[#15181D] shadow' : 'text-[#A8B0BB] hover:text-[#F4F2ED]'}`}
-        >
-          Hyrox
-        </button>
-        <button
-          onClick={() => { setDiscipline('ocr'); setActiveDay(0); }}
-          className={`py-2.5 rounded-xl text-sm font-black transition-all cursor-pointer ${discipline === 'ocr' ? 'bg-[#C084FC] text-[#15181D] shadow' : 'text-[#A8B0BB] hover:text-[#F4F2ED]'}`}
-        >
-          OCR (Obstáculos)
-        </button>
-      </div>
-
-      {/* MI OBJETIVO / SUBNIVELES DE DISCIPLINA */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
+      {/* MI OBJETIVO EN HYROX */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4 bg-[#20252C] border border-[#282F38] p-3 rounded-2xl">
         <div className="flex items-center gap-1.5 flex-wrap">
-          <span className="text-[11px] font-bold text-[#A8B0BB] mr-1">Mi objetivo:</span>
-          {discipline === 'hyrox'
-            ? HYROX_LEVELS.map((l) => (
-                <button
-                  key={l.id}
-                  onClick={() => setHyroxLevel(l.id)}
-                  title={l.description}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                    hyroxLevel === l.id ? 'bg-[#C084FC] border-[#C084FC] text-[#15181D] font-black' : 'bg-[#20252C] border-[#282F38] text-[#A8B0BB] hover:border-[#38414D] hover:text-[#F4F2ED]'
-                  }`}
-                >
-                  {l.name}
-                </button>
-              ))
-            : OCR_TIERS.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setOcrLevel(t.id)}
-                  title={t.description}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
-                    ocrLevel === t.id ? 'bg-[#C084FC] border-[#C084FC] text-[#15181D] font-black' : 'bg-[#20252C] border-[#282F38] text-[#A8B0BB] hover:border-[#38414D] hover:text-[#F4F2ED]'
-                  }`}
-                >
-                  {t.name} · {t.distance}
-                </button>
-              ))}
+          <span className="text-[11px] font-bold text-[#A8B0BB] mr-1">Categoría Hyrox:</span>
+          {HYROX_LEVELS.map((l) => (
+            <button
+              key={l.id}
+              onClick={() => setHyroxLevel(l.id)}
+              title={l.description}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
+                hyroxLevel === l.id ? 'bg-[#C084FC] border-[#C084FC] text-[#15181D] font-black' : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:border-[#38414D] hover:text-[#F4F2ED]'
+              }`}
+            >
+              {l.name}
+            </button>
+          ))}
         </div>
-
-        {/* Nivel de agarre para OCR */}
-        {discipline === 'ocr' && (
-          <div className="flex items-center gap-1 bg-[#20252C] border border-[#282F38] p-1 rounded-xl">
-            <span className="text-[10px] font-bold text-[#A8B0BB] px-1">Agarre:</span>
-            {GRIP_TIERS.map((g) => (
-              <button
-                key={g.id}
-                onClick={() => setGripTier(g.id)}
-                title={g.description}
-                className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                  gripTier === g.id ? 'bg-[#C084FC] text-[#15181D]' : 'text-[#A8B0BB] hover:text-[#F4F2ED]'
-                }`}
-              >
-                {g.name}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* CONSOLA DE TIEMPOS DE ENTRENAMIENTO HYROX (TOTAL + RONDAS/LAPS) */}

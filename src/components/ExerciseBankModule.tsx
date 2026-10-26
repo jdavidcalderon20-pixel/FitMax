@@ -21,6 +21,9 @@ import {
   Info
 } from 'lucide-react';
 import { EXERCISE_BANK, ExerciseDetail, findExerciseDetail } from '../lib/exerciseBank';
+import { getCustomExercises } from '../lib/customExercises';
+import { saveCustomRoutine } from '../lib/customRoutines';
+import CustomExerciseModal from './CustomExerciseModal';
 import { SCIENTIFIC_EXERCISES } from '../data/exercisesData';
 import ExerciseDetailModal from './ExerciseDetailModal';
 import EvidenceBadge from './EvidenceBadge';
@@ -192,6 +195,10 @@ export default function ExerciseBankModule({ nickname, selectedLevel, onNotifica
     }
   });
 
+  // Modal para crear ejercicio personalizado
+  const [showCreateCustomModal, setShowCreateCustomModal] = useState(false);
+  const [customRefresh, setCustomRefresh] = useState(0);
+
   // Modal para cargar rutina personalizada al plan semanal
   const [showLoadModal, setShowLoadModal] = useState(false);
   const [targetWeeklyDay, setTargetWeeklyDay] = useState<number>(1);
@@ -200,9 +207,15 @@ export default function ExerciseBankModule({ nickname, selectedLevel, onNotifica
   const equipmentTypes = ['Todos', 'Mancuernas', 'Barra', 'Máquina', 'Polea', 'Peso corporal', 'Kettlebell', 'Caja / Banco', 'Ergómetro', 'Saco / Lastre'];
   const movementPatterns = ['Todos', 'Empuje horizontal', 'Empuje vertical', 'Tracción vertical', 'Tracción horizontal', 'Dominante rodilla', 'Dominante cadera', 'Aislamiento', 'Metabólico', 'Carga y Agarre'];
 
-  // Enriquecer el banco con evidencia científica mapeada
+  const customExercises = useMemo(() => {
+    return getCustomExercises(nickname);
+  }, [nickname, customRefresh]);
+
+  // Enriquecer el banco con evidencia científica mapeada y fotos
   const enrichedExercises = useMemo(() => {
-    return EXERCISE_BANK.map((ex) => {
+    const combined = [...customExercises, ...EXERCISE_BANK];
+    return combined.map((ex) => {
+      const detail = findExerciseDetail(ex.name);
       const sci = SCIENTIFIC_EXERCISES.find(
         (s) => s.id === ex.id || 
                normalizeForSearch(s.name) === normalizeForSearch(ex.name) ||
@@ -211,11 +224,12 @@ export default function ExerciseBankModule({ nickname, selectedLevel, onNotifica
       const evidence = (sci?.evidence || (ex.level === 'A' ? 'A' : ex.level === 'B' ? 'B' : 'B')) as 'A' | 'B' | 'C';
       return {
         ...ex,
+        demoImages: ex.demoImages || detail.demoImages,
         evidence,
         scientificCues: sci?.cues || []
       };
     });
-  }, []);
+  }, [customExercises]);
 
   // Filtrado de ejercicios
   const filteredExercises = useMemo(() => {
@@ -303,67 +317,46 @@ export default function ExerciseBankModule({ nickname, selectedLevel, onNotifica
     }
   };
 
-  // Cargar la rutina personalizada a un día del Plan Semanal
+  // Guardar la rutina personalizada en el nuevo Gestor de Rutinas Personalizadas (sin alterar el Plan Semanal)
   const handleConfirmLoadToWeekly = async () => {
     if (customList.length === 0) {
-      alert('Agrega al menos un ejercicio a tu rutina antes de cargarla.');
+      alert('Agrega al menos un ejercicio a tu rutina antes de guardarla.');
       return;
     }
 
     try {
-      let routine: WeeklyRoutine | null = null;
-      if (user) {
-        const profile = await fetchUserProfileCloud(user.id);
-        if (profile?.weekly_routine) {
-          routine = profile.weekly_routine;
-        }
-      }
-
-      if (!routine) {
-        const savedRoutineStr = localStorage.getItem(`fit_gen_${nickname}_weekly_routine_${selectedLevel}_v1`)
-          || localStorage.getItem(`fit_gen_${nickname}_weekly_routine_v1`);
-        if (savedRoutineStr) {
-          routine = JSON.parse(savedRoutineStr);
-        }
-      }
-
-      if (!routine || !routine[targetWeeklyDay]) {
-        alert('No se encontró el plan semanal para actualizar. Abre primero el módulo Plan Semanal.');
-        return;
-      }
-
-      const newWeeklyExercises: WeeklyExercise[] = customList.map((item) => ({
-        name: item.exercise.name,
-        category: item.exercise.muscleGroup,
-        defaultSets: item.sets,
-        defaultReps: item.reps,
-        description: item.exercise.targetFocus,
-      }));
-
-      const updatedRoutine: WeeklyRoutine = {
-        ...routine,
-        [targetWeeklyDay]: {
-          ...routine[targetWeeklyDay],
-          subtitle: `${customRoutineName} (${newWeeklyExercises.length} ejercicios creados por ti)`,
-          exercises: newWeeklyExercises,
-        },
+      const newCustomRoutine = {
+        id: `routine_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        name: customRoutineName,
+        description: `${customList.length} ejercicios seleccionados por ti en el catálogo`,
+        targetWeeks: 8,
+        createdAt: Date.now(),
+        days: [
+          {
+            id: 1,
+            name: `Día 1: ${customRoutineName}`,
+            subtitle: `${customList.length} ejercicios`,
+            exercises: customList.map((item) => ({
+              id: item.exercise.id,
+              name: item.exercise.name,
+              category: item.exercise.muscleGroup,
+              defaultSets: item.sets,
+              defaultReps: item.reps,
+              description: item.exercise.targetFocus,
+              restSeconds: 90
+            }))
+          }
+        ]
       };
 
-      // Guardar local
-      localStorage.setItem(`fit_gen_${nickname}_weekly_routine_${selectedLevel}_v1`, JSON.stringify(updatedRoutine));
-
-      // Guardar en la nube si hay usuario
-      if (user) {
-        await updateUserProfileCloud(user.id, { weekly_routine: updatedRoutine });
-      }
-
+      saveCustomRoutine(nickname, newCustomRoutine);
       setShowLoadModal(false);
       if (onNotification) {
-        onNotification(`¡Rutina "${customRoutineName}" asignada exitosamente al Día ${targetWeeklyDay} de tu Plan Semanal!`);
+        onNotification(`¡Rutina "${customRoutineName}" guardada en tu pestaña Rutina Personalizada! 🎯`);
       }
     } catch (e: any) {
       console.error(e);
-      alert('Error al sincronizar con el Plan Semanal.');
+      alert('Error al guardar la rutina personalizada.');
     }
   };
 
@@ -432,6 +425,15 @@ export default function ExerciseBankModule({ nickname, selectedLevel, onNotifica
             Técnica guiada paso a paso, respaldo científico y creador de rutinas para tu plan.
           </p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setShowCreateCustomModal(true)}
+          className="flex items-center gap-2 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black px-4 py-2.5 rounded-2xl text-xs transition-all shadow-[0_4px_15px_rgba(31,208,138,0.25)] cursor-pointer self-start md:self-auto active:scale-95"
+        >
+          <Plus className="w-4 h-4 stroke-[3]" />
+          <span>Crear ejercicio propio</span>
+        </button>
       </div>
 
       {/* CREADOR DE RUTINA PERSONALIZADA */}
@@ -844,6 +846,20 @@ export default function ExerciseBankModule({ nickname, selectedLevel, onNotifica
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL PARA CREAR EJERCICIO PERSONALIZADO */}
+      {showCreateCustomModal && (
+        <CustomExerciseModal
+          nickname={nickname}
+          defaultMuscleGroup="Cuádriceps"
+          onClose={() => setShowCreateCustomModal(false)}
+          onCreated={(newEx) => {
+            setCustomRefresh((prev) => prev + 1);
+            if (onNotification) onNotification(`Ejercicio "${newEx.name}" creado en tu biblioteca`);
+          }}
+          onNotification={onNotification}
+        />
       )}
 
       {/* MODAL DE TÉCNICA */}

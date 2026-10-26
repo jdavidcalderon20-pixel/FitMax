@@ -51,6 +51,12 @@ export default function QuickModule({ nickname, selectedLevel, onNotification }:
   // Modal de técnica
   const [inspectedExercise, setInspectedExercise] = useState<ExerciseDetail | null>(null);
 
+  const formatCleanReps = (reps?: string) => {
+    if (!reps) return 'reps';
+    const clean = reps.replace(/reps?|repeticiones/gi, '').trim();
+    return `${clean} reps`;
+  };
+
   // Rest Timer states
   const [timerDuration, setTimerDuration] = useState<number>(60);
   const [timeLeft, setTimeLeft] = useState<number>(0);
@@ -534,7 +540,7 @@ export default function QuickModule({ nickname, selectedLevel, onNotification }:
                       {exercise.category}
                     </span>
                     <span className="text-[10px] font-bold text-white bg-[#15181D] px-2 py-0.5 rounded-md font-mono">
-                      {exercise.defaultSets}× {exercise.defaultReps} reps
+                      {exercise.defaultSets} × {formatCleanReps(exercise.defaultReps)}
                     </span>
                     <span className="text-[10px] font-bold text-purple-300 bg-purple-950/60 border border-purple-800/40 px-2 py-0.5 rounded-md">
                       RIR {getTargetRIR(exercise.category)}

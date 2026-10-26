@@ -21,7 +21,10 @@ import {
   Navigation,
   Compass,
   MapPin,
-  Download
+  Download,
+  Sparkles,
+  HelpCircle,
+  SlidersHorizontal
 } from 'lucide-react';
 import {
   RunLog,
@@ -49,6 +52,7 @@ import AuthScreen from './AuthScreen';
 import RunningMap from './RunningMap';
 import RunningLiveTracker from './RunningLiveTracker';
 import StravaSyncModal from './StravaSyncModal';
+import RunActivityDetailModal from './RunActivityDetailModal';
 import { GeoPoint, generateGPXString, downloadGPXFile } from '../lib/gpx';
 
 interface RunningModuleProps {
@@ -76,6 +80,9 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
   const [targetWeeks, setTargetWeeks] = useState<number>(12);
   const [weeksRemaining, setWeeksRemaining] = useState<number>(8);
   const [showPeriodization, setShowPeriodization] = useState<boolean>(false);
+  const [runningGoal, setRunningGoal] = useState<'salud_base' | 'ritmo_velocidad' | 'preparar_carrera'>('salud_base');
+  const [showAdvancedPeriodization, setShowAdvancedPeriodization] = useState<boolean>(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Plan de Entrenamiento Guiado
   const [raceDistance, setRaceDistance] = useState<RaceDistance>('10K');
@@ -182,12 +189,40 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
     setFormType('facil');
     setFormRpe(5);
     setFormNotes('');
+    setFormError(null);
+  };
+
+  const handleSelectGoal = (goal: 'salud_base' | 'ritmo_velocidad' | 'preparar_carrera') => {
+    setRunningGoal(goal);
+    if (goal === 'salud_base') {
+      setTargetWeeks(8);
+      setWeeksRemaining(8); // Semana 1 (Fase Base)
+      setRaceDistance('5K');
+    } else if (goal === 'ritmo_velocidad') {
+      setTargetWeeks(12);
+      setWeeksRemaining(Math.round(12 * 0.6)); // Semana 5 (Fase Umbral / Potencia)
+      setRaceDistance('10K');
+    } else if (goal === 'preparar_carrera') {
+      setTargetWeeks(12);
+      setWeeksRemaining(12);
+    }
   };
 
   const handleAddRun = async () => {
-    const distanceKm = parseFloat(formDistance.replace(',', '.'));
-    const durationMin = parseFloat(formDuration.replace(',', '.'));
-    if (!distanceKm || distanceKm <= 0 || !durationMin || durationMin <= 0) return;
+    setFormError(null);
+    const cleanDist = formDistance.replace(',', '.').trim();
+    const cleanDur = formDuration.replace(',', '.').trim();
+    const distanceKm = parseFloat(cleanDist);
+    const durationMin = parseFloat(cleanDur);
+
+    if (isNaN(distanceKm) || distanceKm <= 0) {
+      setFormError('Por favor ingresa una distancia válida en km (ej: 5 o 3.5).');
+      return;
+    }
+    if (isNaN(durationMin) || durationMin <= 0) {
+      setFormError('Por favor ingresa una duración válida en minutos (ej: 25 o 45).');
+      return;
+    }
 
     const draft = {
       date: new Date(formDate).getTime(),
@@ -208,6 +243,11 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
       };
       setLogs((prev) => [...prev, newLog]);
     }
+
+    if (onNotification) {
+      onNotification(`¡Carrera de ${distanceKm} km guardada con éxito!`);
+    }
+
     resetForm();
     setShowForm(false);
   };
@@ -326,6 +366,14 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
   const paceZones = calculatePacesFrom10K(targetPace);
   const typeLabel = (t: RunType) => RUN_TYPES.find((rt) => rt.id === t)?.label || t;
 
+  const formatLogDuration = (min: number) => {
+    const totalSec = Math.round(min * 60);
+    if (totalSec < 60) return `${totalSec}s`;
+    const m = Math.floor(totalSec / 60);
+    const s = totalSec % 60;
+    return s > 0 ? `${m}m ${s}s` : `${m}min`;
+  };
+
   // Sesión actualmente seleccionada por el atleta (libertad total de inspección y orden)
   const activeSession = plannedSessions.find((s) => s.id === selectedSessionId) || plannedSessions[0];
   const isActiveCompleted = Boolean(completedPlanIds[activeSession.id]);
@@ -433,6 +481,100 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
         </div>
       )}
 
+      {/* SELECTOR DE OBJETIVO PARA EL ATLETA (INTUITIVO PARA PRINCIPIANTES) */}
+      <div className="mb-5 bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 text-white shadow-xl space-y-3.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap pb-2.5 border-b border-[#282F38]">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-[#1FD08A] inline-block" />
+            <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-[#F4F2ED]">
+              ¿Cuál es tu objetivo de entrenamiento?
+            </h3>
+          </div>
+          <button
+            onClick={() => setShowAdvancedPeriodization(!showAdvancedPeriodization)}
+            className="text-[11px] font-bold text-[#A8B0BB] hover:text-[#1FD08A] flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            <SlidersHorizontal className="w-3.5 h-3.5 text-[#5B8DEF]" />
+            <span>{showAdvancedPeriodization ? 'Ocultar ajuste avanzado' : 'Ajustar semanas y fases manualmente'}</span>
+          </button>
+        </div>
+
+        {/* 3 Tarjetas de Objetivo */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+          <button
+            onClick={() => handleSelectGoal('salud_base')}
+            className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
+              runningGoal === 'salud_base'
+                ? 'bg-[#1FD08A]/15 border-[#1FD08A] shadow-md shadow-emerald-950/30'
+                : 'bg-[#15181D] border-[#282F38] hover:border-[#1FD08A]/40'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-black text-[#1FD08A] uppercase tracking-wider flex items-center gap-1.5">
+                  <span>🟢</span> 1. Salud y Base (Z2)
+                </span>
+                {runningGoal === 'salud_base' && <Check className="w-4 h-4 text-[#1FD08A]" />}
+              </div>
+              <p className="text-[11px] text-zinc-300 leading-snug">
+                Ideal para iniciarte, quemar grasa y ganar capacidad pulmonar corriendo a ritmo conversacional sin dolor ni fatiga extrema.
+              </p>
+            </div>
+            <span className="text-[10px] font-bold text-[#1FD08A] bg-[#1FD08A]/10 border border-[#1FD08A]/20 px-2.5 py-0.5 rounded-lg self-start">
+              80% Ritmo Cómodo
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleSelectGoal('ritmo_velocidad')}
+            className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
+              runningGoal === 'ritmo_velocidad'
+                ? 'bg-[#5B8DEF]/15 border-[#5B8DEF] shadow-md shadow-blue-950/30'
+                : 'bg-[#15181D] border-[#282F38] hover:border-[#5B8DEF]/40'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-black text-[#5B8DEF] uppercase tracking-wider flex items-center gap-1.5">
+                  <span>🟡</span> 2. Mejorar Ritmo &amp; Velocidad
+                </span>
+                {runningGoal === 'ritmo_velocidad' && <Check className="w-4 h-4 text-[#5B8DEF]" />}
+              </div>
+              <p className="text-[11px] text-zinc-300 leading-snug">
+                Para romper tu estancamiento y correr más rápido. Desarrolla tolerancia al lactato y resistencia mediante cambios de ritmo y series.
+              </p>
+            </div>
+            <span className="text-[10px] font-bold text-[#5B8DEF] bg-[#5B8DEF]/10 border border-[#5B8DEF]/20 px-2.5 py-0.5 rounded-lg self-start">
+              Fase Umbral y Series
+            </span>
+          </button>
+
+          <button
+            onClick={() => handleSelectGoal('preparar_carrera')}
+            className={`p-3.5 rounded-2xl text-left border transition-all cursor-pointer flex flex-col justify-between gap-2.5 ${
+              runningGoal === 'preparar_carrera'
+                ? 'bg-[#FB923C]/15 border-[#FB923C] shadow-md shadow-orange-950/30'
+                : 'bg-[#15181D] border-[#282F38] hover:border-[#FB923C]/40'
+            }`}
+          >
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs font-black text-[#FB923C] uppercase tracking-wider flex items-center gap-1.5">
+                  <span>🟣</span> 3. Preparar Carrera
+                </span>
+                {runningGoal === 'preparar_carrera' && <Check className="w-4 h-4 text-[#FB923C]" />}
+              </div>
+              <p className="text-[11px] text-zinc-300 leading-snug">
+                Planificación estructurada para una competencia (5K a 42K) con fases de volumen, especificidad de ritmo y afinamiento (tapering).
+              </p>
+            </div>
+            <span className="text-[10px] font-bold text-[#FB923C] bg-[#FB923C]/10 border border-[#FB923C]/20 px-2.5 py-0.5 rounded-lg self-start">
+              Plan Periodizado Completo
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* BANNER DE PERIODIZACIÓN Y ADAPTACIÓN DEL PLAN */}
       <div className="mb-5 bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 text-white shadow-xl space-y-4">
         {/* Cabecera del ciclo */}
@@ -456,7 +598,7 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
             </div>
           </div>
 
-          {/* Stepper intuitivo de semana */}
+          {/* Stepper de semana */}
           <div className="flex items-center gap-1.5 bg-[#15181D] border border-[#282F38] rounded-2xl p-1.5">
             <button
               onClick={() => {
@@ -489,66 +631,70 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
           </div>
         </div>
 
-        {/* Duración del ciclo y Selector rápido de fase */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-bold text-[#A8B0BB] flex items-center gap-1">
-              <Calendar className="w-3.5 h-3.5 text-[#5B8DEF]" /> Duración ciclo:
-            </span>
-            <div className="flex gap-1.5">
-              {[
-                { w: 8, label: '8 sem (Rápido)' },
-                { w: 12, label: '12 sem (Recomendado)' },
-                { w: 16, label: '16 sem (Completo)' }
-              ].map((item) => (
-                <button
-                  key={item.w}
-                  onClick={() => {
-                    setTargetWeeks(item.w);
-                    if (currentWeekNumber > item.w) {
-                      setWeeksRemaining(1);
-                    } else {
-                      setWeeksRemaining(item.w - currentWeekNumber + 1);
-                    }
-                  }}
-                  className={`px-2.5 py-1 rounded-xl text-[10px] font-black transition-all border cursor-pointer ${
-                    targetWeeks === item.w
-                      ? 'bg-[#1FD08A] border-[#1FD08A] text-[#15181D] shadow-sm'
-                      : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED]'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
+        {/* Duración del ciclo y Selector de fase avanzado (desplegable para no abrumar a principiantes) */}
+        {showAdvancedPeriodization && (
+          <div className="p-3.5 bg-[#15181D] rounded-2xl border border-[#282F38] space-y-3 animate-fadeIn">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-[#A8B0BB] flex items-center gap-1">
+                  <Calendar className="w-3.5 h-3.5 text-[#5B8DEF]" /> Duración ciclo:
+                </span>
+                <div className="flex gap-1.5">
+                  {[
+                    { w: 8, label: '8 sem (Rápido)' },
+                    { w: 12, label: '12 sem (Recomendado)' },
+                    { w: 16, label: '16 sem (Completo)' }
+                  ].map((item) => (
+                    <button
+                      key={item.w}
+                      onClick={() => {
+                        setTargetWeeks(item.w);
+                        if (currentWeekNumber > item.w) {
+                          setWeeksRemaining(1);
+                        } else {
+                          setWeeksRemaining(item.w - currentWeekNumber + 1);
+                        }
+                      }}
+                      className={`px-2.5 py-1 rounded-xl text-[10px] font-black transition-all border cursor-pointer ${
+                        targetWeeks === item.w
+                          ? 'bg-[#1FD08A] border-[#1FD08A] text-[#15181D] shadow-sm'
+                          : 'bg-[#20252C] border-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED]'
+                      }`}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Salto directo a fases */}
+              <div className="flex items-center gap-1 flex-wrap">
+                <span className="text-[10px] uppercase font-bold text-zinc-500 mr-1">Ir a fase:</span>
+                {[
+                  { id: 'base', name: '1. Base', week: 1 },
+                  { id: 'potencia', name: '2. Umbral', week: Math.round(targetWeeks * 0.4) },
+                  { id: 'compromised', name: '3. Específico', week: Math.round(targetWeeks * 0.75) },
+                  { id: 'tapering', name: '4. Tapering', week: targetWeeks }
+                ].map((p) => {
+                  const isActive = phaseDetails.phase === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => setWeeksRemaining(targetWeeks - p.week + 1)}
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all border cursor-pointer ${
+                        isActive
+                          ? 'bg-[#5B8DEF] border-[#5B8DEF] text-white shadow-sm'
+                          : 'bg-[#20252C] border-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED]'
+                      }`}
+                    >
+                      {p.name}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
-
-          {/* Salto directo a fases */}
-          <div className="flex items-center gap-1 flex-wrap">
-            <span className="text-[10px] uppercase font-bold text-zinc-500 mr-1">Ir a fase:</span>
-            {[
-              { id: 'base', name: '1. Base', week: 1 },
-              { id: 'potencia', name: '2. Umbral', week: Math.round(targetWeeks * 0.4) },
-              { id: 'compromised', name: '3. Específico', week: Math.round(targetWeeks * 0.75) },
-              { id: 'tapering', name: '4. Tapering', week: targetWeeks }
-            ].map((p) => {
-              const isActive = phaseDetails.phase === p.id;
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => setWeeksRemaining(targetWeeks - p.week + 1)}
-                  className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all border cursor-pointer ${
-                    isActive
-                      ? 'bg-[#5B8DEF] border-[#5B8DEF] text-white shadow-sm'
-                      : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED]'
-                  }`}
-                >
-                  {p.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        )}
 
         {/* Tarjeta de Asesoramiento del Coach Experto */}
         <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3.5 sm:p-4 space-y-2">
@@ -910,62 +1056,91 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
       </div>
 
       {showForm && (
-        <div className="mb-5 bg-zinc-50 border border-zinc-200 rounded-2xl p-4 space-y-3">
+        <div className="mb-5 bg-[#20252C] border border-[#282F38] rounded-3xl p-5 space-y-3.5 shadow-xl animate-fadeIn">
+          <div className="flex items-center justify-between border-b border-[#282F38] pb-2.5">
+            <h4 className="text-xs font-black uppercase tracking-wider text-[#F4F2ED] flex items-center gap-2">
+              <Plus className="w-4 h-4 text-[#1FD08A]" />
+              <span>Registro Manual de Carrera</span>
+            </h4>
+            <button
+              onClick={() => {
+                resetForm();
+                setShowForm(false);
+              }}
+              className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-[#15181D]"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {formError && (
+            <div className="p-2.5 bg-red-950/60 border border-red-500/40 rounded-xl text-red-200 text-xs font-bold flex items-center gap-2 animate-fadeIn">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>{formError}</span>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <label className="text-[10px] uppercase font-black text-zinc-400 tracking-wider block mb-1">Fecha</label>
+              <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1">Fecha</label>
               <input
                 type="date"
                 value={formDate}
                 onChange={(e) => setFormDate(e.target.value)}
-                className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-xs font-bold text-zinc-900"
+                className="w-full bg-[#15181D] border border-[#282F38] focus:border-[#1FD08A] rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-[10px] uppercase font-black text-zinc-400 tracking-wider block mb-1">Distancia (km)</label>
+              <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1">Distancia (km)</label>
               <input
                 type="text"
-                placeholder="5"
+                placeholder="Ej: 5 o 3.5"
                 value={formDistance}
-                onChange={(e) => setFormDistance(e.target.value)}
-                className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-xs font-bold text-zinc-900"
+                onChange={(e) => {
+                  setFormDistance(e.target.value);
+                  if (formError) setFormError(null);
+                }}
+                className="w-full bg-[#15181D] border border-[#282F38] focus:border-[#1FD08A] rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-[10px] uppercase font-black text-zinc-400 tracking-wider block mb-1">Duración (min)</label>
+              <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1">Duración (min)</label>
               <input
                 type="text"
-                placeholder="30"
+                placeholder="Ej: 25 o 45"
                 value={formDuration}
-                onChange={(e) => setFormDuration(e.target.value)}
-                className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-xs font-bold text-zinc-900"
+                onChange={(e) => {
+                  setFormDuration(e.target.value);
+                  if (formError) setFormError(null);
+                }}
+                className="w-full bg-[#15181D] border border-[#282F38] focus:border-[#1FD08A] rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-[10px] uppercase font-black text-zinc-400 tracking-wider block mb-1">RPE (1-10)</label>
+              <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1">RPE (1-10)</label>
               <input
                 type="number"
                 min={1}
                 max={10}
                 value={formRpe}
                 onChange={(e) => setFormRpe(Math.min(10, Math.max(1, parseInt(e.target.value, 10) || 1)))}
-                className="w-full bg-white border border-zinc-200 rounded-lg px-2 py-1.5 text-xs font-bold text-zinc-900"
+                className="w-full bg-[#15181D] border border-[#282F38] focus:border-[#1FD08A] rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-[10px] uppercase font-black text-zinc-400 tracking-wider block mb-1.5">Tipo de sesión</label>
+            <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1.5">Tipo de sesión</label>
             <div className="flex flex-wrap gap-1.5">
               {RUN_TYPES.map((t) => (
                 <button
                   key={t.id}
                   onClick={() => setFormType(t.id)}
                   title={t.description}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                     formType === t.id
-                      ? 'bg-emerald-500 border-emerald-500 text-zinc-950'
-                      : 'bg-white border-zinc-200 text-zinc-500 hover:border-zinc-300'
+                      ? 'bg-[#1FD08A] border-[#1FD08A] text-[#15181D]'
+                      : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white'
                   }`}
                 >
                   {t.label}
@@ -975,30 +1150,31 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
           </div>
 
           <div>
-            <label className="text-[10px] uppercase font-black text-zinc-400 tracking-wider block mb-1">Notas (opcional)</label>
+            <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1">Notas (opcional)</label>
             <input
               type="text"
-              placeholder="Sensaciones, clima, terreno..."
+              placeholder="Sensaciones, clima, terreno, zapatillas..."
               value={formNotes}
               onChange={(e) => setFormNotes(e.target.value)}
-              className="w-full bg-white border border-zinc-200 rounded-lg px-3 py-1.5 text-xs text-zinc-900"
+              className="w-full bg-[#15181D] border border-[#282F38] focus:border-[#1FD08A] rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none"
             />
           </div>
 
           <button
             onClick={handleAddRun}
-            className="w-full bg-emerald-500 hover:bg-emerald-400 text-zinc-950 font-black py-2.5 rounded-xl text-sm transition-all"
+            className="w-full bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black py-3 rounded-2xl text-xs sm:text-sm transition-all shadow-md cursor-pointer"
           >
-            Guardar carrera
+            Guardar carrera en Historial
           </button>
         </div>
       )}
 
       <div className="space-y-2 flex-1 overflow-y-auto">
         {sortedLogs.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-zinc-400 py-16">
-            <Footprints className="w-12 h-12 mb-4 opacity-20" />
-            <p className="font-medium">Aún no has registrado carreras</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-[#A8B0BB] py-16 bg-[#20252C]/40 rounded-3xl border border-[#282F38]">
+            <Footprints className="w-12 h-12 mb-4 opacity-20 text-[#1FD08A]" />
+            <p className="font-bold text-sm text-[#F4F2ED]">Aún no has registrado carreras</p>
+            <p className="text-xs text-[#A8B0BB] mt-1">Usa la grabación GPS o el registro manual para empezar.</p>
           </div>
         ) : (
           sortedLogs.map((log) => {
@@ -1007,56 +1183,54 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
             return (
               <div
                 key={log.id}
-                className="flex items-center gap-3 p-3.5 rounded-2xl border border-zinc-200 bg-zinc-50 hover:bg-white transition-all flex-wrap sm:flex-nowrap"
+                className="flex items-center gap-3 p-3.5 rounded-2xl border border-[#282F38] bg-[#20252C] hover:border-[#1FD08A]/40 transition-all flex-wrap sm:flex-nowrap"
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1 flex-wrap">
-                    <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded">
+                    <span className="text-[10px] uppercase font-black tracking-wider text-[#1FD08A] bg-[#1FD08A]/10 border border-[#1FD08A]/20 px-2 py-0.5 rounded-full">
                       {typeLabel(log.type)}
                     </span>
-                    <span className="text-[10px] text-zinc-400 font-bold">
+                    <span className="text-[10px] text-[#A8B0BB] font-bold">
                       {new Date(log.date).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
                     </span>
                     {hasGpsRoute && (
-                      <span className="text-[10px] bg-sky-50 text-sky-700 border border-sky-200 px-1.5 py-0.5 rounded-full font-bold flex items-center gap-1">
-                        <MapPin className="w-2.5 h-2.5 text-sky-500" />
+                      <span className="text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
+                        <MapPin className="w-2.5 h-2.5 text-sky-400" />
                         <span>Ruta GPS ({log.route?.length} pts)</span>
                       </span>
                     )}
                   </div>
-                  <p className="font-extrabold text-sm text-zinc-900">
-                    {log.distanceKm}km · {log.durationMin}min · {calculatePace(log.distanceKm, log.durationMin)}
-                    <span className="text-zinc-400 font-semibold"> · RPE {log.rpe}</span>
+                  <p className="font-extrabold text-sm text-[#F4F2ED]">
+                    {log.distanceKm} km · {formatLogDuration(log.durationMin)} · {calculatePace(log.distanceKm, log.durationMin)}
+                    <span className="text-orange-400 font-bold ml-1.5">· RPE {log.rpe}/10</span>
                   </p>
-                  {log.notes && <p className="text-xs text-zinc-500 mt-0.5">{log.notes}</p>}
+                  {log.notes && <p className="text-xs text-[#A8B0BB] mt-0.5 truncate">{log.notes}</p>}
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
-                  {hasGpsRoute && (
-                    <>
-                      <button
-                        onClick={() => setInspectedRouteLog(log)}
-                        className="px-2.5 py-1.5 bg-zinc-900 hover:bg-zinc-800 text-sky-300 rounded-xl text-xs font-bold flex items-center gap-1 transition-all"
-                        title="Ver trazado en mapa interactivo"
-                      >
-                        <MapPin className="w-3.5 h-3.5" />
-                        <span>Mapa</span>
-                      </button>
+                  <button
+                    onClick={() => setInspectedRouteLog(log)}
+                    className="px-3 py-1.5 bg-[#15181D] hover:bg-[#282F38] text-[#1FD08A] border border-[#1FD08A]/30 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer"
+                    title="Ver detalles completos, mapa y tarjeta para redes sociales"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-[#1FD08A]" />
+                    <span>Ver Actividad</span>
+                  </button>
 
-                      <button
-                        onClick={() => handleDownloadLogGPX(log)}
-                        className="px-2.5 py-1.5 bg-orange-50 hover:bg-orange-100 text-orange-700 border border-orange-200 rounded-xl text-xs font-bold flex items-center gap-1 transition-all"
-                        title="Descargar archivo GPX para Strava"
-                      >
-                        <Download className="w-3.5 h-3.5" />
-                        <span>GPX</span>
-                      </button>
-                    </>
+                  {hasGpsRoute && (
+                    <button
+                      onClick={() => handleDownloadLogGPX(log)}
+                      className="px-2.5 py-1.5 bg-[#15181D] hover:bg-[#282F38] text-orange-400 border border-orange-500/30 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                      title="Descargar archivo GPX para Strava"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      <span>GPX</span>
+                    </button>
                   )}
 
                   <button
                     onClick={() => handleDeleteRun(log.id)}
-                    className="p-2 rounded-lg text-zinc-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
+                    className="p-2 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 cursor-pointer"
                     title="Eliminar registro"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -1086,81 +1260,14 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
         />
       )}
 
-      {/* MODAL PARA VER MAPA DE RUTA GUARDADA */}
+      {/* MODAL ENRIQUECIDO DE ACTIVIDAD & CREADOR DE TARJETAS SOCIALES */}
       {inspectedRouteLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-fadeIn">
-          <div className="bg-zinc-950 text-white rounded-3xl max-w-xl w-full border border-zinc-800 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="p-4 sm:p-5 border-b border-zinc-800 flex items-center justify-between bg-zinc-900/60">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                  <MapPin className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="font-extrabold text-sm sm:text-base text-white">
-                    Trazado de Ruta ({inspectedRouteLog.distanceKm} km)
-                  </h3>
-                  <p className="text-xs text-zinc-400">
-                    {new Date(inspectedRouteLog.date).toLocaleDateString('es-CO', {
-                      weekday: 'long',
-                      day: 'numeric',
-                      month: 'long',
-                    })}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setInspectedRouteLog(null)}
-                className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-4 sm:p-5 flex-1 min-h-[300px] flex flex-col">
-              <div className="flex-1 min-h-[260px] rounded-2xl overflow-hidden mb-4">
-                <RunningMap
-                  route={inspectedRouteLog.route || []}
-                  height="100%"
-                  interactive={true}
-                  autoFit={true}
-                />
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 bg-zinc-900 p-3 rounded-2xl border border-zinc-800 text-center mb-4">
-                <div>
-                  <span className="text-[10px] text-zinc-400 font-bold uppercase">Distancia</span>
-                  <p className="text-base font-black text-emerald-400">{inspectedRouteLog.distanceKm} km</p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-zinc-400 font-bold uppercase">Duración</span>
-                  <p className="text-base font-black text-white">{inspectedRouteLog.durationMin} min</p>
-                </div>
-                <div>
-                  <span className="text-[10px] text-zinc-400 font-bold uppercase">Ritmo Medio</span>
-                  <p className="text-base font-black text-sky-400">
-                    {calculatePace(inspectedRouteLog.distanceKm, inspectedRouteLog.durationMin)}
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleDownloadLogGPX(inspectedRouteLog)}
-                  className="flex-1 py-3 bg-zinc-900 hover:bg-zinc-800 text-orange-400 border border-orange-500/30 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>Exportar GPX a Strava</span>
-                </button>
-                <button
-                  onClick={() => setInspectedRouteLog(null)}
-                  className="px-5 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-xl text-xs font-bold transition-all"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <RunActivityDetailModal
+          log={inspectedRouteLog}
+          nickname={nickname}
+          onClose={() => setInspectedRouteLog(null)}
+          onNotification={onNotification}
+        />
       )}
 
       {showAuthScreen && <AuthScreen onClose={() => setShowAuthScreen(false)} />}

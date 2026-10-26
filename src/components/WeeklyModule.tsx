@@ -27,6 +27,8 @@ import {
 } from 'lucide-react';
 import WorkoutSessionView from './WorkoutSessionView';
 import { Level } from '../types';
+import CustomExerciseModal from './CustomExerciseModal';
+import { getCustomExercises } from '../lib/customExercises';
 import { 
   WeeklyRoutine, 
   WeeklyDay,
@@ -91,6 +93,13 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
 
   // Estado para sustituir ejercicio individual de la rutina
   const [swapModalState, setSwapModalState] = useState<{ dayId: number; exIndex: number; currentName: string } | null>(null);
+  const [showCustomExModal, setShowCustomExModal] = useState<boolean>(false);
+
+  const formatCleanReps = (reps?: string) => {
+    if (!reps) return 'reps';
+    const clean = reps.replace(/reps?|repeticiones/gi, '').trim();
+    return `${clean} reps`;
+  };
 
   // Estado para sustituir ejercicio individual del Finisher (AMRAP)
   const [swapAmrapModalState, setSwapAmrapModalState] = useState<{
@@ -1079,7 +1088,7 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
                       {exercise.category}
                     </span>
                     <span className="text-[10px] font-bold text-white bg-[#15181D] px-2 py-0.5 rounded-md font-mono">
-                      {exercise.defaultSets}× {exercise.defaultReps} reps
+                      {exercise.defaultSets} × {formatCleanReps(exercise.defaultReps)}
                     </span>
                     <span className="text-[10px] font-bold text-purple-300 bg-purple-950/60 border border-purple-800/40 px-2 py-0.5 rounded-md">
                       RIR {getTargetRIR(exercise.category)}
@@ -1558,6 +1567,15 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
             </p>
 
             <div className="space-y-2 mb-5 max-h-72 overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => setShowCustomExModal(true)}
+                className="w-full text-center py-2.5 px-3 rounded-2xl bg-[#1FD08A]/10 hover:bg-[#1FD08A]/20 border border-[#1FD08A]/30 text-xs font-bold text-[#1FD08A] transition-all flex items-center justify-center gap-1.5 cursor-pointer mb-2"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Crear mi propio ejercicio</span>
+              </button>
+
               {getAlternativeWeeklyExercises(swapModalState.dayId, swapModalState.exIndex, selectedLevel, routineFocus, routineDays).map((alt) => {
                 const isSelected = alt.name === swapModalState.currentName;
                 return (
@@ -1575,7 +1593,7 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
                       <p className="font-extrabold text-xs text-white">{alt.name}</p>
                       <p className="text-[11px] text-[#A8B0BB] mt-0.5">{alt.description}</p>
                       <span className="inline-block mt-1 text-[10px] font-bold text-[#A8B0BB] font-mono">
-                        {alt.defaultSets} series × {alt.defaultReps} reps
+                        {alt.defaultSets} series × {formatCleanReps(alt.defaultReps)}
                       </span>
                     </div>
                     {isSelected ? (
@@ -1598,6 +1616,27 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
             </div>
           </div>
         </div>
+      )}
+
+      {/* MODAL PARA CREAR EJERCICIO PERSONALIZADO DESDE SUSTITUCIÓN */}
+      {showCustomExModal && swapModalState && (
+        <CustomExerciseModal
+          nickname={nickname}
+          defaultMuscleGroup="Cuádriceps"
+          onClose={() => setShowCustomExModal(false)}
+          onCreated={(newEx) => {
+            const altExercise: WeeklyExercise = {
+              name: newEx.name,
+              category: newEx.muscleGroup,
+              defaultSets: 4,
+              defaultReps: '8-10 reps',
+              description: newEx.targetFocus
+            };
+            handleSwapExercise(altExercise);
+            setShowCustomExModal(false);
+          }}
+          onNotification={onNotification}
+        />
       )}
 
       {/* MODAL PARA SUSTITUIR UN EJERCICIO DEL FINISHER (AMRAP) */}

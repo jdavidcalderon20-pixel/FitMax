@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   HeartPulse, 
   Clock, 
@@ -177,51 +177,84 @@ export default function HiitModule() {
     setHiitRunning(false);
   }, [cardioMode, hiitPreset, selectedFunctionalId]);
 
+  // Referencia mutable atómica para el temporizador que evita desincronizaciones y dobles incrementos
+  const hiitStateRef = useRef({
+    running: hiitRunning,
+    phase: hiitPhase,
+    timeLeft: hiitTimeLeft,
+    round: hiitRound,
+    totalRounds: hiitTotalRounds,
+    workDuration: hiitWorkDuration,
+    restDuration: hiitRestDuration,
+    isMuted
+  });
+
+  useEffect(() => {
+    hiitStateRef.current = {
+      running: hiitRunning,
+      phase: hiitPhase,
+      timeLeft: hiitTimeLeft,
+      round: hiitRound,
+      totalRounds: hiitTotalRounds,
+      workDuration: hiitWorkDuration,
+      restDuration: hiitRestDuration,
+      isMuted
+    };
+  });
+
   useEffect(() => {
     let intervalId: any = null;
-    if (hiitRunning && hiitPhase !== 'complete') {
+    if (hiitRunning) {
       intervalId = setInterval(() => {
-        setHiitTimeLeft((prev) => {
-          if (prev === 4 || prev === 3 || prev === 2) {
-            playBeepSound(isMuted);
-          }
+        const state = hiitStateRef.current;
+        if (!state.running || state.phase === 'complete') return;
 
-          if (prev <= 1) {
-            if (hiitPhase === 'prep') {
-              setHiitPhase('work');
-              playBeepSound(isMuted);
-              return hiitWorkDuration;
-            } else if (hiitPhase === 'work') {
-              if (hiitRound >= hiitTotalRounds) {
-                setHiitPhase('complete');
-                setHiitRunning(false);
-                playBeepSound(isMuted);
-                return 0;
-              } else {
-                setHiitPhase('rest');
-                playBeepSound(isMuted);
-                return hiitRestDuration;
-              }
-            } else if (hiitPhase === 'rest') {
-              setHiitRound((r) => r + 1);
-              setHiitPhase('work');
-              playBeepSound(isMuted);
-              return hiitWorkDuration;
+        // Beep en los últimos 3 segundos
+        if (state.timeLeft === 4 || state.timeLeft === 3 || state.timeLeft === 2) {
+          playBeepSound(state.isMuted);
+        }
+
+        if (state.timeLeft <= 1) {
+          playBeepSound(state.isMuted);
+
+          if (state.phase === 'prep') {
+            setHiitPhase('work');
+            setHiitTimeLeft(state.workDuration);
+          } else if (state.phase === 'work') {
+            if (state.round >= state.totalRounds) {
+              setHiitPhase('complete');
+              setHiitRunning(false);
+              setHiitTimeLeft(0);
+            } else {
+              setHiitPhase('rest');
+              setHiitTimeLeft(state.restDuration);
             }
-            return 0;
+          } else if (state.phase === 'rest') {
+            // Avance estricto y atómico de ronda
+            setHiitRound(state.round + 1);
+            setHiitPhase('work');
+            setHiitTimeLeft(state.workDuration);
           }
-          return prev - 1;
-        });
+        } else {
+          setHiitTimeLeft(state.timeLeft - 1);
+        }
       }, 1000);
     }
     return () => {
       if (intervalId) clearInterval(intervalId);
     };
-  }, [hiitRunning, hiitTimeLeft, hiitPhase, hiitRound, hiitTotalRounds, hiitWorkDuration, hiitRestDuration, isMuted]);
+  }, [hiitRunning]);
 
-  // Estación actual activa en el modo funcional
+  // Estación actual activa en modo funcional o HIIT
+  const activeHiitPresetObj = hiitPresets[hiitPreset];
+  const hiitStationsList = activeHiitPresetObj.exercises;
+  const currentHiitStationIndex = (hiitRound - 1) % hiitStationsList.length;
+  const nextHiitStationIndex = hiitRound % hiitStationsList.length;
+
   const currentStationIndex = (hiitRound - 1) % activeFunctionalRoutine.stations.length;
+  const nextStationIndex = hiitRound % activeFunctionalRoutine.stations.length;
   const currentStation = activeFunctionalRoutine.stations[currentStationIndex];
+  const nextStation = activeFunctionalRoutine.stations[nextStationIndex];
   const currentRoundNumber = Math.floor((hiitRound - 1) / activeFunctionalRoutine.stations.length) + 1;
 
   return (
@@ -353,6 +386,74 @@ export default function HiitModule() {
                 </button>
               );
             })}
+          </div>
+
+          {/* Tarjeta de Circuito Seleccionado para HIIT (Alineado con Funcional) */}
+          <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 shadow-xl space-y-4">
+            <div className="flex items-center justify-between gap-2 flex-wrap border-b border-[#282F38] pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase text-[#FB923C] tracking-wider">
+                  Protocolo seleccionado
+                </span>
+                <h3 className="text-sm sm:text-base font-black text-[#F4F2ED]">
+                  {activeHiitPresetObj.name}
+                </h3>
+                <p className="text-xs text-[#A8B0BB] mt-0.5">
+                  {hiitStationsList.length} estaciones recomendadas · {activeHiitPresetObj.rounds} intervalos de esfuerzo puro.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-black text-[#FB923C] bg-[#FB923C]/10 border border-[#FB923C]/20 px-3 py-1 rounded-xl">
+                  {activeHiitPresetObj.work}s Trabajo / {activeHiitPresetObj.rest}s Pausa
+                </span>
+              </div>
+            </div>
+
+            {/* Estaciones recomendadas de este protocolo con botón para ver técnica y fotos */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5">
+              {hiitStationsList.map((exName, sIdx) => {
+                const isCurrentStationInTimer = cardioMode === 'hiit' && hiitRunning && currentHiitStationIndex === sIdx;
+                const detail = findExerciseDetail(exName);
+                return (
+                  <div
+                    key={sIdx}
+                    onClick={() => setInspectedExercise(detail)}
+                    className={`p-3 rounded-2xl border transition-all cursor-pointer group flex flex-col justify-between ${
+                      isCurrentStationInTimer
+                        ? 'bg-[#FB923C]/20 border-[#FB923C] ring-1 ring-[#FB923C] shadow-md'
+                        : 'bg-[#15181D] border-[#282F38] hover:border-[#38414D]'
+                    }`}
+                    title="Toca para ver técnica y fotos de demostración"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="w-5 h-5 rounded-full bg-[#FB923C]/20 text-[#FB923C] text-[10px] font-black flex items-center justify-center">
+                          {sIdx + 1}
+                        </span>
+                        <Info className="w-3.5 h-3.5 text-[#A8B0BB] group-hover:text-[#FB923C] transition-colors" />
+                      </div>
+                      <p className="text-xs font-bold text-[#F4F2ED] group-hover:text-[#FB923C] transition-colors line-clamp-2">
+                        {exName}
+                      </p>
+                    </div>
+                    <p className="text-[10px] text-[#A8B0BB] mt-2 pt-1 border-t border-[#282F38]/60 leading-tight">
+                      {detail.targetFocus || detail.muscleGroup}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Consejos del coach para este protocolo */}
+            <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3 text-xs text-[#A8B0BB] space-y-1">
+              <span className="text-[10px] font-black uppercase text-[#FB923C] block">
+                Consejos del coach para este protocolo:
+              </span>
+              <p className="text-zinc-300 text-[11px] leading-relaxed">
+                {activeHiitPresetObj.description} En los intervalos de descanso activo, camina suavemente y respira hondo por la nariz para disipar el lactato muscular sin detenerte de golpe.
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -517,14 +618,28 @@ export default function HiitModule() {
               <Clock className="w-5 h-5 text-[#FB923C]" />
               {hiitPhase === 'complete'
                 ? '¡Sesión finalizada con éxito!'
+                : hiitPhase === 'prep'
+                ? 'Prepárate para comenzar'
+                : hiitPhase === 'rest'
+                ? (cardioMode === 'functional'
+                    ? `Pausa (Próximo: ${nextStation?.name || 'Siguiente'})`
+                    : `Pausa (Próximo: ${hiitStationsList[nextHiitStationIndex] || 'Siguiente'})`)
                 : cardioMode === 'functional'
-                ? `Estación: ${currentStation?.name || activeFunctionalRoutine.name}`
-                : `Sesión: ${hiitPresets[hiitPreset].name}`}
+                ? `Estación ${currentStationIndex + 1}: ${currentStation?.name || activeFunctionalRoutine.name}`
+                : `Estación ${currentHiitStationIndex + 1}: ${hiitStationsList[currentHiitStationIndex] || activeHiitPresetObj.name}`}
             </h3>
             <p className="text-xs text-[#A8B0BB] mt-1 leading-relaxed">
-              {hiitPhase === 'prep' && 'Prepárate para iniciar con técnica limpia y máxima potencia.'}
-              {hiitPhase === 'work' && (cardioMode === 'functional' ? `Realiza: ${currentStation?.focus || 'Intervalo activo de trabajo'}` : '¡Potencia alta! Mantén el esfuerzo durante todo el intervalo.')}
-              {hiitPhase === 'rest' && 'Reduce pulsaciones suavemente y respira profundo por la nariz para oxigenar.'}
+              {hiitPhase === 'prep' && 'Ajusta tu postura e inicia en cuanto suene el pitido.'}
+              {hiitPhase === 'work' && (
+                cardioMode === 'functional'
+                  ? `Enfócate en: ${currentStation?.focus || 'Intervalo activo de trabajo'}`
+                  : `Realiza: ${hiitStationsList[currentHiitStationIndex]}. ¡Intensidad sostenida!`
+              )}
+              {hiitPhase === 'rest' && (
+                <span>
+                  Respira profundo por la nariz y exhala por la boca. Siguiente estación: <strong className="text-white">{cardioMode === 'functional' ? nextStation?.name : hiitStationsList[nextHiitStationIndex]}</strong>.
+                </span>
+              )}
               {hiitPhase === 'complete' && 'Has completado el entrenamiento de hoy. Gran trabajo de acondicionamiento.'}
             </p>
           </div>

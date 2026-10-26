@@ -237,7 +237,7 @@ export const EXERCISE_MEDIA_DATABASE: ExerciseMediaEntry[] = [
   },
   {
     id: 'pendlay_row',
-    matchPatterns: [/pendlay/i, /remo.*pendlay/i],
+    matchPatterns: [/pendlay/i, /remo.*pendlay/i, /remo.*desde.*el.*suelo/i, /remo.*suelo/i],
     canonicalName: 'Remo Pendlay con barra (Dead-Stop desde el suelo)',
     muscleGroup: 'Espalda',
     pattern: 'Tracción horizontal',
@@ -258,8 +258,8 @@ export const EXERCISE_MEDIA_DATABASE: ExerciseMediaEntry[] = [
     breathingTip: 'Inhala profundo y presuriza el abdomen (maniobra de Valsalva) antes del tirón; exhala al contactar el esternón y descender al piso.',
     targetFocus: 'Fuerza explosiva pura de tracción y densidad brutal de la espalda alta (romboides y trapecio) eliminando cualquier balanceo.',
     demoImages: [
-      `${CDN_BASE}/Barbell_Rear_Delt_Row/0.jpg`,
-      `${CDN_BASE}/Barbell_Rear_Delt_Row/1.jpg`
+      `${CDN_BASE}/Bent_Over_Barbell_Row/0.jpg`,
+      `${CDN_BASE}/Bent_Over_Barbell_Row/1.jpg`
     ]
   },
   {
@@ -744,8 +744,8 @@ export const EXERCISE_MEDIA_DATABASE: ExerciseMediaEntry[] = [
     breathingTip: 'Inhala profundamente en el abdomen antes de bajar; exhala al superar la mitad de la subida.',
     targetFocus: 'Fuerza máxima y volumen de todo el tren inferior.',
     demoImages: [
-      `${CDN_BASE}/Barbell_Full_Squat/0.jpg`,
-      `${CDN_BASE}/Barbell_Full_Squat/1.jpg`
+      `${CDN_BASE}/Box_Squat/0.jpg`,
+      `${CDN_BASE}/Box_Squat/1.jpg`
     ]
   },
   {
@@ -767,8 +767,8 @@ export const EXERCISE_MEDIA_DATABASE: ExerciseMediaEntry[] = [
     breathingTip: 'Inhala al descender; exhala al subir.',
     targetFocus: 'Excelente para pulir la profundidad y postura con bajo estrés lumbar.',
     demoImages: [
-      `${CDN_BASE}/Goblet_Squat/0.jpg`,
-      `${CDN_BASE}/Goblet_Squat/1.jpg`
+      `${CDN_BASE}/Dumbbell_Squat/0.jpg`,
+      `${CDN_BASE}/Dumbbell_Squat/1.jpg`
     ]
   },
   {
@@ -1084,8 +1084,8 @@ export const EXERCISE_MEDIA_DATABASE: ExerciseMediaEntry[] = [
     breathingTip: 'Inhala en el estiramiento profundo; exhala con fuerza al empujar y elevar los talones.',
     targetFocus: 'Hipertrofia del sóleo (músculo monoarticular clave para el ancho de la pantorrilla y absorción de impacto en carrera).',
     demoImages: [
-      `${CDN_BASE}/Seated_Calf_Raise/0.jpg`,
-      `${CDN_BASE}/Seated_Calf_Raise/1.jpg`
+      `${CDN_BASE}/Barbell_Seated_Calf_Raise/0.jpg`,
+      `${CDN_BASE}/Barbell_Seated_Calf_Raise/1.jpg`
     ]
   },
   {

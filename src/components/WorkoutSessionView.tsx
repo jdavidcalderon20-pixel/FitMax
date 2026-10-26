@@ -14,11 +14,15 @@ import {
   ArrowRight,
   TrendingDown,
   TrendingUp,
-  RefreshCw
+  RefreshCw,
+  Plus,
+  Minus
 } from 'lucide-react';
 import { Level } from '../types';
 import { ExerciseDetail, findExerciseDetail, EXERCISE_BANK } from '../lib/exerciseBank';
+import { getCustomExercises } from '../lib/customExercises';
 import ExerciseDetailModal from './ExerciseDetailModal';
+import CustomExerciseModal from './CustomExerciseModal';
 import { playBeepSound } from '../lib/sound';
 
 export interface SetEntry {
@@ -65,6 +69,7 @@ export default function WorkoutSessionView({
   const [inspectedExercise, setInspectedExercise] = useState<ExerciseDetail | null>(null);
   const [showMenu, setShowMenu] = useState<boolean>(false);
   const [showSwapModal, setShowSwapModal] = useState<boolean>(false);
+  const [showCustomExModal, setShowCustomExModal] = useState<boolean>(false);
   const [swapType, setSwapType] = useState<'easier' | 'harder' | 'alternative'>('alternative');
 
   // Estado de series por cada ejercicio: clave `${exerciseName}`
@@ -215,11 +220,42 @@ export default function WorkoutSessionView({
     return detail.targetFocus || detail.muscleGroup || 'movimiento guiado';
   };
 
-  // Calcular RIR e indicación clara
+  // Añadir una serie en vivo
+  const handleAddSet = () => {
+    setExerciseSets((prev) => {
+      const exName = currentExercise.name;
+      const sets = prev[exName] ? [...prev[exName]] : [];
+      const last = sets[sets.length - 1];
+      const weight = last ? last.weight : '20';
+      const reps = last ? last.reps : '8';
+      const newSet: SetEntry = {
+        setNumber: sets.length + 1,
+        weight,
+        reps,
+        completed: false,
+        previousRecord: last?.previousRecord || `${weight} kg × ${reps}`
+      };
+      return { ...prev, [exName]: [...sets, newSet] };
+    });
+    if (onNotification) onNotification('Serie añadida al ejercicio');
+  };
+
+  // Quitar la última serie en vivo
+  const handleRemoveSet = () => {
+    setExerciseSets((prev) => {
+      const exName = currentExercise.name;
+      const sets = prev[exName] ? [...prev[exName]] : [];
+      if (sets.length <= 1) return prev;
+      return { ...prev, [exName]: sets.slice(0, -1) };
+    });
+    if (onNotification) onNotification('Última serie eliminada');
+  };
+
+  // Calcular RIR e indicación clara y dinámica
   const getExerciseGuidanceText = (ex: typeof currentExercise) => {
-    const setsCount = ex.defaultSets || 4;
-    const repsRange = ex.defaultReps || '5 a 6 repeticiones';
-    return `${setsCount} series de ${repsRange}. Te deben quedar 2 o 3 repeticiones en reserva.`;
+    const setsCount = currentSets.length || ex.defaultSets || 4;
+    const cleanReps = (ex.defaultReps || '6 a 8 reps').replace(/reps?|repeticiones/gi, '').trim();
+    return `${setsCount} series de ${cleanReps} reps. Te deben quedar 2 o 3 repeticiones en reserva (RIR 2-3).`;
   };
 
   // Navegar al siguiente ejercicio o terminar
@@ -232,22 +268,25 @@ export default function WorkoutSessionView({
     }
   };
 
-  // Opciones de sustitución (Más fácil, Más difícil, Alternativa)
+  // Opciones de sustitución (Más fácil, Más difícil, Alternativa + Personalizados)
   const getSwapCandidates = () => {
     const detail = findExerciseDetail(currentExercise.name);
+    const customList = getCustomExercises(nickname);
+    const fullBank = [...customList, ...EXERCISE_BANK];
+
     if (swapType === 'easier') {
-      return EXERCISE_BANK.filter(
+      return fullBank.filter(
         (b) => b.id !== detail.id && b.muscleGroup === detail.muscleGroup && (b.equipment === 'Mancuernas' || b.equipment === 'Máquina' || b.equipment === 'Peso corporal')
-      ).slice(0, 4);
+      ).slice(0, 6);
     }
     if (swapType === 'harder') {
-      return EXERCISE_BANK.filter(
+      return fullBank.filter(
         (b) => b.id !== detail.id && b.muscleGroup === detail.muscleGroup && (b.level === 'C' || b.equipment === 'Barra')
-      ).slice(0, 4);
+      ).slice(0, 6);
     }
-    return EXERCISE_BANK.filter(
+    return fullBank.filter(
       (b) => b.id !== detail.id && b.muscleGroup === detail.muscleGroup
-    ).slice(0, 4);
+    ).slice(0, 6);
   };
 
   return (
@@ -448,6 +487,34 @@ export default function WorkoutSessionView({
                 );
               })}
             </div>
+
+            {/* CONTROL DINÁMICO DE SERIES (+/-) */}
+            <div className="flex items-center justify-between pt-3 border-t border-[#282F38] mt-3">
+              <span className="text-xs text-[#A8B0BB] font-medium">
+                Total: <strong className="text-white font-bold">{currentSets.length}</strong> {currentSets.length === 1 ? 'serie' : 'series'}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleRemoveSet}
+                  disabled={currentSets.length <= 1}
+                  className="px-2.5 py-1.5 rounded-xl bg-[#15181D] hover:bg-rose-950/40 text-xs text-[#A8B0BB] hover:text-rose-400 border border-[#282F38] disabled:opacity-30 disabled:pointer-events-none transition-all flex items-center gap-1 font-bold cursor-pointer active:scale-95"
+                  title="Quitar última serie si vas con el tiempo justo"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                  <span>Quitar serie</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddSet}
+                  className="px-2.5 py-1.5 rounded-xl bg-[#15181D] hover:bg-[#1FD08A]/10 text-xs text-[#1FD08A] border border-[#1FD08A]/40 hover:border-[#1FD08A] transition-all flex items-center gap-1 font-black cursor-pointer active:scale-95"
+                  title="Agregar una serie más"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Agregar serie</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* CHIPS DE ACCIÓN RÁPIDA: Más fácil / Más difícil / Alternativa */}
@@ -550,6 +617,18 @@ export default function WorkoutSessionView({
             </p>
 
             <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSwapModal(false);
+                  setShowCustomExModal(true);
+                }}
+                className="w-full text-center py-2.5 px-3 rounded-2xl bg-[#1FD08A]/10 hover:bg-[#1FD08A]/20 border border-[#1FD08A]/30 text-xs font-bold text-[#1FD08A] transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Crear mi propio ejercicio</span>
+              </button>
+
               {getSwapCandidates().map((candidate) => (
                 <button
                   key={candidate.id}
@@ -574,6 +653,20 @@ export default function WorkoutSessionView({
             </button>
           </div>
         </div>
+      )}
+
+      {/* MODAL PARA CREAR EJERCICIO PERSONALIZADO */}
+      {showCustomExModal && (
+        <CustomExerciseModal
+          nickname={nickname}
+          defaultMuscleGroup={findExerciseDetail(currentExercise.name).muscleGroup}
+          onClose={() => setShowCustomExModal(false)}
+          onCreated={(newEx) => {
+            if (onSwapExercise) onSwapExercise(currentExIndex, newEx.name);
+            if (onNotification) onNotification(`¡Ejercicio cambiado a tu creación: ${newEx.name}!`);
+          }}
+          onNotification={onNotification}
+        />
       )}
 
       {/* MODAL DE TÉCNICA DEL EJERCICIO (Ficha completa con fotos reales) */}
