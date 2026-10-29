@@ -23,7 +23,9 @@ import { RunType, RUN_TYPES, calculatePace } from '../lib/running';
 import {
   PlannedRunningSession,
   RunningWorkoutBlock,
-  buildWorkoutBlocksFromSession
+  buildWorkoutBlocksFromSession,
+  parsePaceRangeBounds,
+  formatPaceRangeLabel
 } from '../lib/runningPlans';
 import RunningMap from './RunningMap';
 
@@ -75,7 +77,13 @@ export default function RunningLiveTracker({
   // Configuración de alertas antes y durante el entreno
   const [alertDistanceMeters, setAlertDistanceMeters] = useState<DistanceAlertInterval>(defaultAlertMeters);
   const [alertLast10Sec, setAlertLast10Sec] = useState<boolean>(true);
+  const [paceRangeAlertEnabled, setPaceRangeAlertEnabled] = useState<boolean>(true);
   const [voiceCoachEnabled, setVoiceCoachEnabled] = useState<boolean>(true);
+
+  // Solo mostrar el aviso de 10s cuando la sesión tiene múltiples bloques/segmentos o bloques por tiempo/descanso
+  const hasMultipleOrTimedBlocks = React.useMemo(() => {
+    return workoutBlocks.length > 1 || workoutBlocks.some((b) => b.targetType === 'time' || b.phaseType === 'recovery');
+  }, [workoutBlocks]);
 
   // Estado de ejecución en vivo
   const [isTracking, setIsTracking] = useState(false);
@@ -228,6 +236,7 @@ export default function RunningLiveTracker({
   const totalDistanceKm = Math.round((gpsDistanceKm + addedIndoorKm) * 1000) / 1000;
   const durationMin = elapsedSeconds / 60;
   const currentPaceStr = calculatePace(totalDistanceKm, durationMin);
+  const currentPaceDecimal = totalDistanceKm >= 0.05 && durationMin > 0 ? durationMin / totalDistanceKm : null;
 
   // Bloque activo y siguiente bloque
   const currentBlock: RunningWorkoutBlock | null =
@@ -238,6 +247,19 @@ export default function RunningLiveTracker({
     workoutBlocks.length > 0 && currentBlockIndex + 1 < workoutBlocks.length
       ? workoutBlocks[currentBlockIndex + 1]
       : null;
+
+  // Rango de ritmo objetivo del bloque activo o de la sesión general
+  const activePaceBounds = React.useMemo(() => {
+    const rawTarget = currentBlock?.targetPace || plannedSession?.targetPaceLabel;
+    return parsePaceRangeBounds(rawTarget, 8);
+  }, [currentBlock?.targetPace, plannedSession?.targetPaceLabel]);
+
+  const livePaceZoneStatus: 'in_range' | 'too_fast' | 'too_slow' | null = React.useMemo(() => {
+    if (!activePaceBounds || currentPaceDecimal === null || currentBlock?.phaseType === 'recovery') return null;
+    if (currentPaceDecimal < activePaceBounds.fastestDecimal - 0.03) return 'too_fast';
+    if (currentPaceDecimal > activePaceBounds.slowestDecimal + 0.03) return 'too_slow';
+    return 'in_range';
+  }, [activePaceBounds, currentPaceDecimal, currentBlock?.phaseType]);
 
   // Progreso dentro del bloque activo
   const blockDistanceCoveredKm = Math.max(0, totalDistanceKm - blockStartDistanceKm);
@@ -368,14 +390,43 @@ export default function RunningLiveTracker({
           ? `Kilómetro ${currentStepCount}`
           : `${distReachedMeters} metros`;
 
+      let paceFeedbackMsg = '';
+      if (paceRangeAlertEnabled && activePaceBounds && currentPaceDecimal !== null && currentBlock?.phaseType !== 'recovery') {
+        if (currentPaceDecimal < activePaceBounds.fastestDecimal - 0.03) {
+          paceFeedbackMsg = ` Vas más rápido del rango sugerido (${activePaceBounds.rangeLabel}), afloja un poco el paso.`;
+        } else if (currentPaceDecimal > activePaceBounds.slowestDecimal + 0.03) {
+          paceFeedbackMsg = ` Estás por debajo del ritmo sugerido (${activePaceBounds.rangeLabel}), debes apretar un poco.`;
+        } else {
+          paceFeedbackMsg = ` Estás dentro del rango sugerido (${activePaceBounds.rangeLabel}). ¡Excelente paso!`;
+        }
+      }
+
       playBeep(880, 150, 1);
-      speakCoach(`${distLabel} completado. Parcial: ${splitMins} minutos y ${splitSecs} segundos.`);
+      speakCoach(`${distLabel} completado. Parcial: ${splitMins} minutos y ${splitSecs} segundos.${paceFeedbackMsg}`);
 
       if (typeof navigator !== 'undefined' && navigator.vibrate) {
         navigator.vibrate([200, 100, 200]);
       }
     }
-  }, [totalDistanceKm, isTracking, isPaused, alertDistanceMeters, elapsedSeconds]);
+  }, [totalDistanceKm, isTracking, isPaused, alertDistanceMeters, elapsedSeconds, paceRangeAlertEnabled, activePaceBounds, currentPaceDecimal, currentBlock?.phaseType]);
+
+  // Alerta periódica de control de rango de ritmo cada 90 segundos de carrera activa
+  useEffect(() => {
+    if (!isTracking || isPaused || !paceRangeAlertEnabled || !activePaceBounds || currentPaceDecimal === null) return;
+    if (currentBlock?.phaseType === 'recovery') return;
+    if (elapsedSeconds > 0 && elapsedSeconds % 90 === 0) {
+      const cleanPace = currentPaceStr.replace('/km', '');
+      if (currentPaceDecimal < activePaceBounds.fastestDecimal - 0.03) {
+        playBeep(660, 140, 2);
+        speakCoach(`Control de ritmo: vas a ${cleanPace} por kilómetro, más rápido del rango sugerido. Afloja un poco.`);
+      } else if (currentPaceDecimal > activePaceBounds.slowestDecimal + 0.03) {
+        playBeep(520, 160, 2);
+        speakCoach(`Control de ritmo: vas a ${cleanPace} por kilómetro, por debajo del rango sugerido. Aprieta un poco el paso.`);
+      } else {
+        speakCoach(`Control de ritmo: ${cleanPace} por kilómetro. Estás dentro del rango sugerido.`);
+      }
+    }
+  }, [elapsedSeconds, isTracking, isPaused, paceRangeAlertEnabled, activePaceBounds, currentPaceDecimal, currentPaceStr, currentBlock?.phaseType]);
 
   // Iniciar Entrenamiento con conexión GPS real por defecto en el móvil
   const startWorkoutWithGps = () => {
@@ -682,25 +733,51 @@ export default function RunningLiveTracker({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-[#282F38]/70">
-                <div>
-                  <p className="text-xs font-bold text-white">Aviso en los últimos 10 segundos de descanso/serie</p>
-                  <p className="text-[10px] text-[#A8B0BB]">
-                    Te avisa con voz y cuenta regresiva (10s... 3, 2, 1) para prepararte antes del siguiente bloque.
-                  </p>
+              {hasMultipleOrTimedBlocks && (
+                <div className="flex items-center justify-between pt-2 border-t border-[#282F38]/70">
+                  <div>
+                    <p className="text-xs font-bold text-white">Aviso en los últimos 10 segundos de descanso/serie</p>
+                    <p className="text-[10px] text-[#A8B0BB]">
+                      Te avisa con voz y cuenta regresiva (10s... 3, 2, 1) para prepararte antes del siguiente bloque.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAlertLast10Sec(!alertLast10Sec)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer shrink-0 ${
+                      alertLast10Sec
+                        ? 'bg-[#1FD08A] text-[#15181D] border-[#1FD08A]'
+                        : 'bg-[#15181D] text-zinc-400 border-[#282F38]'
+                    }`}
+                  >
+                    {alertLast10Sec ? 'Activado ✓' : 'Desactivado'}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setAlertLast10Sec(!alertLast10Sec)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer shrink-0 ${
-                    alertLast10Sec
-                      ? 'bg-[#1FD08A] text-[#15181D] border-[#1FD08A]'
-                      : 'bg-[#15181D] text-zinc-400 border-[#282F38]'
-                  }`}
-                >
-                  {alertLast10Sec ? 'Activado ✓' : 'Desactivado'}
-                </button>
-              </div>
+              )}
+
+              {activePaceBounds && (
+                <div className="flex items-center justify-between pt-2 border-t border-[#282F38]/70">
+                  <div>
+                    <p className="text-xs font-bold text-white">
+                      Alerta de rango de ritmo ({activePaceBounds.rangeLabel})
+                    </p>
+                    <p className="text-[10px] text-[#A8B0BB]">
+                      Te avisa si vas muy rápido (&ldquo;afloja un poco&rdquo;), muy lento (&ldquo;aprieta el paso&rdquo;) o dentro del rango sugerido.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPaceRangeAlertEnabled(!paceRangeAlertEnabled)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer shrink-0 ${
+                      paceRangeAlertEnabled
+                        ? 'bg-[#1FD08A] text-[#15181D] border-[#1FD08A]'
+                        : 'bg-[#15181D] text-zinc-400 border-[#282F38]'
+                    }`}
+                  >
+                    {paceRangeAlertEnabled ? 'Activado ✓' : 'Desactivado'}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -872,7 +949,10 @@ export default function RunningLiveTracker({
                       <span className="flex items-center gap-1.5 truncate">
                         <ChevronRight className="w-3.5 h-3.5 text-[#1FD08A] shrink-0" />
                         <span>Siguiente bloque:</span>
-                        <strong className="text-white truncate">{nextBlock.title}</strong>
+                        <strong className="text-white truncate">
+                          {nextBlock.title}
+                          {nextBlock.targetPace ? ` (${nextBlock.targetPace})` : ''}
+                        </strong>
                       </span>
                       <span className="text-[10px] font-mono text-zinc-400 shrink-0 ml-2">
                         ({currentBlockIndex + 2}/{workoutBlocks.length})
@@ -888,7 +968,7 @@ export default function RunningLiveTracker({
           <div className="grid grid-cols-3 gap-2 sm:gap-3">
             <div className="bg-[#20252C] p-3 rounded-2xl border border-[#282F38] text-center">
               <span className="text-[10px] font-bold text-[#A8B0BB] uppercase tracking-wider block mb-0.5">
-                Distancia Real
+                Distancia
               </span>
               <span className="text-xl sm:text-2xl font-black font-mono text-[#1FD08A]">
                 {totalDistanceKm.toFixed(2)}
@@ -917,17 +997,38 @@ export default function RunningLiveTracker({
 
             <div className="bg-[#20252C] p-3 rounded-2xl border border-[#282F38] text-center">
               <span className="text-[10px] font-bold text-[#A8B0BB] uppercase tracking-wider block mb-0.5">
-                Ritmo Real
+                Ritmo
               </span>
               <span className="text-xl sm:text-2xl font-black font-mono text-sky-400">
                 {currentPaceStr.replace('/km', '')}
               </span>
               <span className="text-[10px] text-zinc-500 font-bold ml-1">/km</span>
-              {plannedSession && (
+              {activePaceBounds ? (
+                <div className="mt-0.5">
+                  <span className="block text-[9px] text-[#A8B0BB] truncate">
+                    Rango: {activePaceBounds.rangeLabel.replace(' min/km', '')}
+                  </span>
+                  {livePaceZoneStatus === 'in_range' && (
+                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-[#1FD08A]/15 text-[#1FD08A] text-[9px] font-black">
+                      ✓ En rango
+                    </span>
+                  )}
+                  {livePaceZoneStatus === 'too_fast' && (
+                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] font-black">
+                      ⚠️ Afloja un poco
+                    </span>
+                  )}
+                  {livePaceZoneStatus === 'too_slow' && (
+                    <span className="inline-block mt-0.5 px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[9px] font-black">
+                      ⚡ Aprieta el paso
+                    </span>
+                  )}
+                </div>
+              ) : plannedSession ? (
                 <span className="block text-[10px] text-[#A8B0BB] mt-0.5 truncate">
-                  Ref: {plannedSession.targetPaceLabel}
+                  Ref: {formatPaceRangeLabel(plannedSession.targetPaceLabel)}
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
 

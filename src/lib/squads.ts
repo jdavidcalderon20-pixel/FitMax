@@ -21,6 +21,8 @@ export interface SharedRoutinePayload {
   authorNickname: string;
   sharedAt: number;
   type: 'weekly_4day' | 'custom_bank';
+  targetWeeks?: number;
+  cycleLabel?: string;
   daysData?: SharedDay[];
   exercisesData?: SharedExercise[];
 }
@@ -42,7 +44,7 @@ export interface SquadMember {
   id: string;
   squadId: string;
   nickname: string;
-  role: 'leader' | 'member';
+  role: 'leader' | 'admin' | 'member';
   joinedAt: number;
   lastCheckinAt?: number;
   lastActivityText?: string;
@@ -72,6 +74,7 @@ export interface SquadMeetup {
   squadId: string;
   creatorNickname: string;
   title: string;
+  description?: string;
   date: string;
   time: string;
   location: string;
@@ -128,16 +131,16 @@ export const DEFAULT_SQUAD_POSTS: Record<string, SquadPost[]> = {
       reactions: { fire: 4, fist: 3, muscle: 2 },
       isDemo: true,
       comments: [
-        { id: 'c_1', nickname: 'Lucas_OCR', content: '¡Totalmente de acuerdo, la cadencia salva el día!', createdAt: Date.now() - 3600000 * 2 }
+        { id: 'c_1', nickname: 'Lucas_Hyrox', content: '¡Totalmente de acuerdo, la cadencia salva el día!', createdAt: Date.now() - 3600000 * 2 }
       ],
       createdAt: Date.now() - 3600000 * 3
     },
     {
       id: 'post_h2',
       squadId: 'squad_hyrox_titans',
-      nickname: 'Lucas_OCR',
-      content: 'Completé las 4 rondas de cuelgues con toalla. El agarre quemaba pero salió todo.',
-      activityBadge: 'Agarre OCR',
+      nickname: 'Lucas_Hyrox',
+      content: 'Completé las 4 rondas de Wall Balls y Farmer Carry pesado. La fatiga acumulada quemaba pero salió todo en ritmo.',
+      activityBadge: 'Estaciones Hyrox',
       discipline: 'hyrox_ocr',
       reactions: { fire: 3, fist: 2, muscle: 4 },
       isDemo: true,
@@ -176,9 +179,9 @@ export const DEFAULT_SQUAD_POSTS: Record<string, SquadPost[]> = {
 export const DEFAULT_COMMUNITY_SQUADS: Squad[] = [
   {
     id: 'squad_hyrox_titans',
-    name: 'Titanes Hyrox & OCR',
+    name: 'Titanes Hyrox & Funcional',
     code: 'HYR202',
-    motto: 'Corremos con piernas fatigadas, conquistamos cada obstáculo.',
+    motto: 'Corremos con piernas fatigadas, conquistamos cada estación.',
     discipline: 'hyrox_ocr',
     creatorNickname: 'Coach_Marcos',
     membersCount: 8,
@@ -190,6 +193,8 @@ export const DEFAULT_COMMUNITY_SQUADS: Squad[] = [
       authorNickname: 'Coach_Marcos',
       sharedAt: Date.now() - 86400000 * 2,
       type: 'weekly_4day',
+      targetWeeks: 4,
+      cycleLabel: '4 semanas',
       daysData: [
         {
           dayId: 1,
@@ -203,11 +208,11 @@ export const DEFAULT_COMMUNITY_SQUADS: Squad[] = [
         },
         {
           dayId: 2,
-          title: 'Día 2: Agarre & Suspensiones OCR',
+          title: 'Día 2: Potencia de Pierna, Carries & Wall Balls',
           exercises: [
-            { name: 'Cuelgue Pasivo en Barra', sets: 4, reps: '60s' },
-            { name: 'Dominadas con Toalla / Agarre Neutro', sets: 4, reps: '8-10' },
-            { name: 'Farmer Walks Pesados', sets: 4, reps: '40m' }
+            { name: 'Wall Balls (Lanzamiento de Balón)', sets: 4, reps: '25 reps' },
+            { name: 'Remo Ergómetro (Rowing) + 1km Carrera', sets: 4, reps: '500m' },
+            { name: 'Farmers Carry Pesados (Mancuernas/Kettlebells)', sets: 4, reps: '100m' }
           ]
         }
       ]
@@ -229,6 +234,8 @@ export const DEFAULT_COMMUNITY_SQUADS: Squad[] = [
       authorNickname: 'Elena_Run',
       sharedAt: Date.now() - 86400000 * 5,
       type: 'weekly_4day',
+      targetWeeks: 8,
+      cycleLabel: '8 semanas',
       daysData: [
         {
           dayId: 1,
@@ -269,6 +276,8 @@ export const DEFAULT_COMMUNITY_SQUADS: Squad[] = [
       authorNickname: 'Carlos_Lift',
       sharedAt: Date.now() - 86400000 * 1,
       type: 'weekly_4day',
+      targetWeeks: 8,
+      cycleLabel: '8 semanas',
       daysData: [
         {
           dayId: 1,

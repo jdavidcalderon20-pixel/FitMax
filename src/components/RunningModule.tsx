@@ -43,6 +43,7 @@ import {
   generateRunningPlan, 
   calculateRaceFinishTime, 
   formatPaceDecimal, 
+  formatPaceRangeLabel,
   PlannedRunningSession,
   RunningWorkoutBlock,
   getRunningCoachGuidance,
@@ -93,13 +94,26 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
   // Rutinas de Running Personalizadas del usuario
   const [customSessions, setCustomSessions] = useState<PlannedRunningSession[]>([]);
   const [showCustomModal, setShowCustomModal] = useState<boolean>(false);
-  const [customName, setCustomName] = useState<string>('Mis Series 5 × 1000m');
+  const [customBuilderMode, setCustomBuilderMode] = useState<'blocks' | 'intervals'>('blocks');
+  const [customName, setCustomName] = useState<string>('Cambio de Ritmo 3K + 1K');
+  const [customFreeBlocks, setCustomFreeBlocks] = useState<
+    {
+      id: string;
+      phaseType: 'warmup' | 'work' | 'recovery' | 'cooldown';
+      targetType: 'distance' | 'time';
+      valueStr: string; // km si es distance, segundos si es time
+      paceStr: string;
+    }[]
+  >([
+    { id: 'fb_1', phaseType: 'warmup', targetType: 'distance', valueStr: '3.0', paceStr: '5:35 - 5:50 min/km' },
+    { id: 'fb_2', phaseType: 'work', targetType: 'distance', valueStr: '1.0', paceStr: '4:35 - 4:50 min/km' },
+  ]);
   const [customWarmupKm, setCustomWarmupKm] = useState<string>('2.0');
   const [customReps, setCustomReps] = useState<string>('5');
   const [customIntervalMeters, setCustomIntervalMeters] = useState<string>('1000');
   const [customRestSec, setCustomRestSec] = useState<string>('90');
   const [customCooldownKm, setCustomCooldownKm] = useState<string>('1.5');
-  const [customPaceLabel, setCustomPaceLabel] = useState<string>('4:30 min/km');
+  const [customPaceLabel, setCustomPaceLabel] = useState<string>('4:25 - 4:40 min/km');
 
   useEffect(() => {
     setCustomSessions(getCustomRunningSessions(nickname));
@@ -277,6 +291,87 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
   };
 
   const handleCreateCustomRunningSession = () => {
+    if (customBuilderMode === 'blocks') {
+      const validBlocks = customFreeBlocks.filter((b) => (parseFloat(b.valueStr.replace(',', '.')) || 0) > 0);
+      if (validBlocks.length === 0) return;
+
+      let totalKm = 0;
+      let totalTimeMin = 0;
+      const customBlocks: RunningWorkoutBlock[] = [];
+      const structure: string[] = [];
+
+      validBlocks.forEach((b, idx) => {
+        const val = parseFloat(b.valueStr.replace(',', '.')) || 1;
+        const cleanPace = formatPaceRangeLabel(b.paceStr || '5:00 - 5:15 min/km', 8);
+        const phaseLabel =
+          b.phaseType === 'warmup'
+            ? 'Calentamiento'
+            : b.phaseType === 'work'
+            ? `Bloque ${idx + 1}`
+            : b.phaseType === 'recovery'
+            ? 'Recuperación'
+            : 'Vuelta a la calma';
+
+        if (b.targetType === 'distance') {
+          totalKm += val;
+          totalTimeMin += val * 5.2;
+          customBlocks.push({
+            id: `cb_${idx + 1}`,
+            phaseType: b.phaseType,
+            title: `${phaseLabel} · ${val} km`,
+            targetType: 'distance',
+            targetValue: val,
+            targetPace: cleanPace,
+            instructions: `Corre ${val} km en el rango sugerido (${cleanPace}).`
+          });
+          structure.push(`${phaseLabel}: ${val} km a rango sugerido (${cleanPace}).`);
+        } else {
+          const secs = Math.round(val);
+          totalTimeMin += secs / 60;
+          customBlocks.push({
+            id: `cb_${idx + 1}`,
+            phaseType: b.phaseType,
+            title: `${phaseLabel} · ${secs}s`,
+            targetType: 'time',
+            targetValue: secs,
+            targetPace: b.phaseType === 'recovery' ? undefined : cleanPace,
+            instructions:
+              b.phaseType === 'recovery'
+                ? `${secs} segundos de descanso o trote regenerativo.`
+                : `${secs} segundos manteniendo rango ${cleanPace}.`
+          });
+          structure.push(
+            b.phaseType === 'recovery'
+              ? `Descanso de ${secs} segundos antes del siguiente bloque.`
+              : `${phaseLabel}: ${secs} segundos a rango (${cleanPace}).`
+          );
+        }
+      });
+
+      const primaryWorkBlock = customBlocks.find((b) => b.phaseType === 'work') || customBlocks[0];
+      const newSession: PlannedRunningSession = {
+        id: `custom_run_${Date.now()}`,
+        dayTitle: 'Sesión Personalizada por Bloques',
+        type: 'tempo',
+        name: customName.trim() || `Ruta por Bloques (${ Math.round(totalKm * 10) / 10 } km)`,
+        distanceKm: Math.max(0.5, Math.round(totalKm * 100) / 100),
+        targetPaceLabel: primaryWorkBlock?.targetPace || '5:00 - 5:15 min/km',
+        estimatedDurationMin: Math.max(10, Math.round(totalTimeMin)),
+        rpe: 7,
+        focus: 'Transición automática entre bloques con aviso de nuevo ritmo sugerido y control de rango en vivo.',
+        structure,
+        isCustom: true,
+        customBlocks
+      };
+
+      const updated = saveCustomRunningSession(nickname, newSession);
+      setCustomSessions(updated);
+      setSelectedSessionId(newSession.id);
+      setShowCustomModal(false);
+      if (onNotification) onNotification(`¡Rutina "${newSession.name}" creada con ${customBlocks.length} bloques!`);
+      return;
+    }
+
     const warmupKm = Math.max(0, parseFloat(customWarmupKm.replace(',', '.')) || 0);
     const reps = Math.max(1, parseInt(customReps, 10) || 1);
     const meters = Math.max(100, parseInt(customIntervalMeters, 10) || 1000);
@@ -284,6 +379,7 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
     const cooldownKm = Math.max(0, parseFloat(customCooldownKm.replace(',', '.')) || 0);
     const intervalKm = Math.round((meters / 1000) * 1000) / 1000;
     const totalKm = Math.round((warmupKm + reps * intervalKm + cooldownKm) * 100) / 100;
+    const formattedRange = formatPaceRangeLabel(customPaceLabel, 8);
 
     const customBlocks: RunningWorkoutBlock[] = [];
     let bIdx = 1;
@@ -294,6 +390,7 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
         title: `Calentamiento · ${warmupKm} km`,
         targetType: 'distance',
         targetValue: warmupKm,
+        targetPace: `${paceZones.easyZone12.min.replace('/km', '')} - ${paceZones.easyZone12.max.replace('/km', '')} min/km`,
         instructions: `${warmupKm} km de trote suave de calentamiento.`
       });
     }
@@ -304,8 +401,8 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
         title: `Serie ${r} de ${reps} · ${meters}m`,
         targetType: 'distance',
         targetValue: intervalKm,
-        targetPace: customPaceLabel,
-        instructions: `Completa ${meters}m a ritmo objetivo (${customPaceLabel}).`
+        targetPace: formattedRange,
+        instructions: `Completa ${meters}m dentro del rango (${formattedRange}).`
       });
       if (restSec > 0) {
         customBlocks.push({
@@ -325,13 +422,14 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
         title: `Vuelta a la calma · ${cooldownKm} km`,
         targetType: 'distance',
         targetValue: cooldownKm,
+        targetPace: `${paceZones.easyZone12.min.replace('/km', '')} - ${paceZones.easyZone12.max.replace('/km', '')} min/km`,
         instructions: `${cooldownKm} km de trote muy suave regenerativo.`
       });
     }
 
     const structure: string[] = [];
     if (warmupKm > 0) structure.push(`${warmupKm} km de trote suave de calentamiento.`);
-    structure.push(`${reps} repeticiones de ${meters}m exactos a ritmo objetivo (${customPaceLabel}).`);
+    structure.push(`${reps} repeticiones de ${meters}m exactos a rango objetivo (${formattedRange}).`);
     if (restSec > 0) structure.push(`${restSec} segundos de recuperación entre cada serie.`);
     if (cooldownKm > 0) structure.push(`${cooldownKm} km de trote suave de vuelta a la calma.`);
 
@@ -341,7 +439,7 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
       type: reps > 1 ? 'series' : 'tempo',
       name: customName.trim() || `Series ${reps} × ${meters}m`,
       distanceKm: Math.max(0.5, totalKm),
-      targetPaceLabel: customPaceLabel || '4:45 min/km',
+      targetPaceLabel: formattedRange || '4:25 - 4:40 min/km',
       estimatedDurationMin: Math.max(15, Math.round(totalKm * 5.2 + (reps * restSec) / 60)),
       rpe: 8,
       focus: 'Entrenamiento estructurado personalizado con guía de bloques y alertas en vivo.',
@@ -1040,7 +1138,10 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
             <div>
               <h4 className="text-base sm:text-lg font-black text-white">{activeSession.name}</h4>
               <p className="text-xs text-[#A8B0BB] font-semibold mt-0.5">
-                Ritmo sugerido de referencia: <span className="text-[#1FD08A] font-bold">{activeSession.targetPaceLabel}</span>
+                Rango de ritmo sugerido:{' '}
+                <span className="text-[#1FD08A] font-bold font-mono">
+                  {formatPaceRangeLabel(activeSession.targetPaceLabel, 8)}
+                </span>
               </p>
             </div>
 
@@ -1213,7 +1314,7 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
       {/* MODAL CREADOR DE RUTINA DE RUNNING PERSONALIZADA */}
       {showCustomModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="bg-[#15181D] border border-[#282F38] rounded-3xl w-full max-w-md p-5 text-white shadow-2xl space-y-4">
+          <div className="bg-[#15181D] border border-[#282F38] rounded-3xl w-full max-w-lg p-5 text-white shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-[#282F38] pb-3">
               <div>
                 <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A] block">
@@ -1229,6 +1330,32 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
               </button>
             </div>
 
+            {/* Selector de modo: Bloques Secuenciales vs Series Clásicas */}
+            <div className="grid grid-cols-2 gap-1.5 bg-[#20252C] p-1 rounded-2xl border border-[#282F38]">
+              <button
+                type="button"
+                onClick={() => setCustomBuilderMode('blocks')}
+                className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  customBuilderMode === 'blocks'
+                    ? 'bg-[#1FD08A] text-[#15181D] shadow'
+                    : 'text-[#A8B0BB] hover:text-white'
+                }`}
+              >
+                Por Bloques y Ritmos (Ej: 3K + 1K)
+              </button>
+              <button
+                type="button"
+                onClick={() => setCustomBuilderMode('intervals')}
+                className={`py-2 px-3 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                  customBuilderMode === 'intervals'
+                    ? 'bg-[#1FD08A] text-[#15181D] shadow'
+                    : 'text-[#A8B0BB] hover:text-white'
+                }`}
+              >
+                Series Repetidas (Ej: 5 × 1000m)
+              </button>
+            </div>
+
             <div className="space-y-3 text-xs">
               <div>
                 <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Nombre de la sesión</label>
@@ -1236,80 +1363,237 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
                   type="text"
                   value={customName}
                   onChange={(e) => setCustomName(e.target.value)}
-                  placeholder="Ej: Series 5 × 1000m en pista"
+                  placeholder="Ej: Progresivo 3 km Z2 + 1 km Umbral"
                   className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Calentamiento (km)</label>
-                  <input
-                    type="text"
-                    value={customWarmupKm}
-                    onChange={(e) => setCustomWarmupKm(e.target.value)}
-                    placeholder="2.0"
-                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Vuelta a la calma (km)</label>
-                  <input
-                    type="text"
-                    value={customCooldownKm}
-                    onChange={(e) => setCustomCooldownKm(e.target.value)}
-                    placeholder="1.5"
-                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
-                  />
-                </div>
-              </div>
+              {customBuilderMode === 'blocks' ? (
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-[#A8B0BB]">
+                      Bloques secuenciales (la app te avisará al pasar de un bloque al siguiente):
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCustomFreeBlocks((prev) => [
+                          ...prev,
+                          {
+                            id: `fb_${Date.now()}`,
+                            phaseType: 'work',
+                            targetType: 'distance',
+                            valueStr: '1.0',
+                            paceStr: `${paceZones.umbralPace.min.replace('/km', '')} - ${paceZones.umbralPace.max.replace('/km', '')} min/km`
+                          }
+                        ])
+                      }
+                      className="px-2.5 py-1 rounded-lg bg-[#1FD08A]/15 text-[#1FD08A] border border-[#1FD08A]/30 font-black text-[11px] cursor-pointer"
+                    >
+                      + Añadir bloque
+                    </button>
+                  </div>
 
-              <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">N° de Series</label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="30"
-                    value={customReps}
-                    onChange={(e) => setCustomReps(e.target.value)}
-                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Distancia (m)</label>
-                  <input
-                    type="number"
-                    step="100"
-                    min="100"
-                    value={customIntervalMeters}
-                    onChange={(e) => setCustomIntervalMeters(e.target.value)}
-                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
-                  />
-                </div>
-                <div>
-                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Descanso (seg)</label>
-                  <input
-                    type="number"
-                    step="15"
-                    min="0"
-                    value={customRestSec}
-                    onChange={(e) => setCustomRestSec(e.target.value)}
-                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
-                  />
-                </div>
-              </div>
+                  {customFreeBlocks.map((b, idx) => (
+                    <div key={b.id} className="bg-[#20252C] border border-[#282F38] rounded-2xl p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black uppercase text-[#1FD08A]">
+                          Bloque {idx + 1}
+                        </span>
+                        {customFreeBlocks.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setCustomFreeBlocks((prev) => prev.filter((item) => item.id !== b.id))}
+                            className="text-zinc-500 hover:text-rose-400 text-[11px] font-bold cursor-pointer"
+                          >
+                            Quitar
+                          </button>
+                        )}
+                      </div>
 
-              <div>
-                <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Ritmo objetivo de las series</label>
-                <input
-                  type="text"
-                  value={customPaceLabel}
-                  onChange={(e) => setCustomPaceLabel(e.target.value)}
-                  placeholder="Ej: 4:20 min/km"
-                  className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
-                />
-              </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[10px] text-[#A8B0BB] block mb-0.5">Tipo de fase</label>
+                          <select
+                            value={b.phaseType}
+                            onChange={(e) => {
+                              const nextType = e.target.value as any;
+                              setCustomFreeBlocks((prev) =>
+                                prev.map((item) =>
+                                  item.id === b.id
+                                    ? {
+                                        ...item,
+                                        phaseType: nextType,
+                                        targetType: nextType === 'recovery' ? 'time' : item.targetType,
+                                        valueStr: nextType === 'recovery' ? '90' : item.valueStr
+                                      }
+                                    : item
+                                )
+                              );
+                            }}
+                            className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-2 py-1.5 text-white font-bold text-[11px]"
+                          >
+                            <option value="warmup">Calentamiento</option>
+                            <option value="work">Carrera / Serie</option>
+                            <option value="recovery">Descanso</option>
+                            <option value="cooldown">Enfriamiento</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-[#A8B0BB] block mb-0.5">Medir por</label>
+                          <select
+                            value={b.targetType}
+                            onChange={(e) => {
+                              const nextT = e.target.value as 'distance' | 'time';
+                              setCustomFreeBlocks((prev) =>
+                                prev.map((item) =>
+                                  item.id === b.id
+                                    ? { ...item, targetType: nextT, valueStr: nextT === 'distance' ? '1.0' : '90' }
+                                    : item
+                                )
+                              );
+                            }}
+                            className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-2 py-1.5 text-white font-bold text-[11px]"
+                          >
+                            <option value="distance">Distancia (km)</option>
+                            <option value="time">Tiempo (seg)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="text-[10px] text-[#A8B0BB] block mb-0.5">
+                            {b.targetType === 'distance' ? 'Kilómetros' : 'Segundos'}
+                          </label>
+                          <input
+                            type="text"
+                            value={b.valueStr}
+                            onChange={(e) =>
+                              setCustomFreeBlocks((prev) =>
+                                prev.map((item) => (item.id === b.id ? { ...item, valueStr: e.target.value } : item))
+                              )
+                            }
+                            placeholder={b.targetType === 'distance' ? '3.0' : '90'}
+                            className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-2.5 py-1.5 text-white font-bold text-[11px]"
+                          />
+                        </div>
+                      </div>
+
+                      {b.phaseType !== 'recovery' && (
+                        <div>
+                          <div className="flex items-center justify-between mb-1">
+                            <label className="text-[10px] text-[#A8B0BB]">Rango de ritmo sugerido para este bloque:</label>
+                            <div className="flex gap-1">
+                              {[
+                                { label: 'Z2 Suave', val: `${paceZones.easyZone12.min.replace(/\/km/g, '')} - ${paceZones.easyZone12.max.replace(/\/km/g, '')} min/km` },
+                                { label: 'Tempo', val: `${paceZones.tempoPace.min.replace(/\/km/g, '')} - ${paceZones.tempoPace.max.replace(/\/km/g, '')} min/km` },
+                                { label: 'Umbral', val: `${paceZones.umbralPace.min.replace(/\/km/g, '')} - ${paceZones.umbralPace.max.replace(/\/km/g, '')} min/km` },
+                                { label: 'VO2', val: `${paceZones.sprint400m.min.replace(/\/km/g, '')} - ${paceZones.sprint400m.max.replace(/\/km/g, '')} min/km` }
+                              ].map((z) => (
+                                <button
+                                  key={z.label}
+                                  type="button"
+                                  onClick={() =>
+                                    setCustomFreeBlocks((prev) =>
+                                      prev.map((item) => (item.id === b.id ? { ...item, paceStr: z.val } : item))
+                                    )
+                                  }
+                                  className="px-1.5 py-0.5 rounded bg-[#15181D] hover:bg-[#1FD08A]/20 text-[9px] font-bold text-[#1FD08A] border border-[#282F38] cursor-pointer"
+                                >
+                                  {z.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                          <input
+                            type="text"
+                            value={b.paceStr}
+                            onChange={(e) =>
+                              setCustomFreeBlocks((prev) =>
+                                prev.map((item) => (item.id === b.id ? { ...item, paceStr: e.target.value } : item))
+                              )
+                            }
+                            placeholder="Ej: 5:20 - 5:35 min/km"
+                            className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-2.5 py-1.5 text-white font-mono font-bold text-[11px]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Calentamiento (km)</label>
+                      <input
+                        type="text"
+                        value={customWarmupKm}
+                        onChange={(e) => setCustomWarmupKm(e.target.value)}
+                        placeholder="2.0"
+                        className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Vuelta a la calma (km)</label>
+                      <input
+                        type="text"
+                        value={customCooldownKm}
+                        onChange={(e) => setCustomCooldownKm(e.target.value)}
+                        placeholder="1.5"
+                        className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">N° de Series</label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="30"
+                        value={customReps}
+                        onChange={(e) => setCustomReps(e.target.value)}
+                        className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Distancia (m)</label>
+                      <input
+                        type="number"
+                        step="100"
+                        min="100"
+                        value={customIntervalMeters}
+                        onChange={(e) => setCustomIntervalMeters(e.target.value)}
+                        className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Descanso (seg)</label>
+                      <input
+                        type="number"
+                        step="15"
+                        min="0"
+                        value={customRestSec}
+                        onChange={(e) => setCustomRestSec(e.target.value)}
+                        className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Rango de ritmo objetivo de las series</label>
+                    <input
+                      type="text"
+                      value={customPaceLabel}
+                      onChange={(e) => setCustomPaceLabel(e.target.value)}
+                      placeholder="Ej: 4:25 - 4:35 min/km"
+                      className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="flex gap-2 pt-2">

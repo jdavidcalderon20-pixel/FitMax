@@ -116,6 +116,7 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
   const [sessionInitialIndex, setSessionInitialIndex] = useState<number>(0);
   const [showEditPlanModal, setShowEditPlanModal] = useState<boolean>(false);
   const [showPlanMenu, setShowPlanMenu] = useState<boolean>(false);
+  const [showCycleCompleteModal, setShowCycleCompleteModal] = useState<boolean>(false);
   const [warmupOpen, setWarmupOpen] = useState<boolean>(false);
   const [amrapOpen, setAmrapOpen] = useState<boolean>(false);
 
@@ -287,10 +288,12 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
         setWeeklyRoutineStartDate(Date.now());
       }
 
+      let parsedTargetWeeks = 8;
       try {
         const savedTarget = localStorage.getItem(`fit_gen_${nickname}_weekly_mesocycle_target_weeks`);
         if (savedTarget) {
-          setMesocycleTargetWeeks(parseInt(savedTarget, 10) || 8);
+          parsedTargetWeeks = parseInt(savedTarget, 10) || 8;
+          setMesocycleTargetWeeks(parsedTargetWeeks);
         }
       } catch (e) {
         setMesocycleTargetWeeks(8);
@@ -299,7 +302,14 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
       try {
         const savedWeek = localStorage.getItem(`fit_gen_${nickname}_weekly_mesocycle_current_week`);
         if (savedWeek) {
-          setMesocycleWeek(Math.max(1, parseInt(savedWeek, 10) || 1));
+          const rawW = Math.max(1, parseInt(savedWeek, 10) || 1);
+          if (rawW > parsedTargetWeeks) {
+            setMesocycleWeek(parsedTargetWeeks);
+            localStorage.setItem(`fit_gen_${nickname}_weekly_mesocycle_current_week`, String(parsedTargetWeeks));
+            setShowCycleCompleteModal(true);
+          } else {
+            setMesocycleWeek(rawW);
+          }
         } else {
           setMesocycleWeek(1);
         }
@@ -538,12 +548,16 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
     });
   };
 
-  // Iniciar nueva semana avanzando microciclo y manteniendo pesos de referencia
+  // Iniciar nueva semana avanzando microciclo o finalizar el ciclo al llegar a la semana meta
   const handleResetWeeklyProgress = () => {
-    const nextWeek = Math.min(mesocycleTargetWeeks + 1, mesocycleWeek + 1);
+    if (mesocycleWeek >= mesocycleTargetWeeks) {
+      setShowCycleCompleteModal(true);
+      return;
+    }
+    const nextWeek = mesocycleWeek + 1;
     if (
       window.confirm(
-        `Vas a avanzar a la Semana ${nextWeek} de tu mesociclo: se desmarcarán los ejercicios para iniciar el nuevo microciclo, pero tus pesos y repeticiones se mantendrán intactos para aplicar sobrecarga progresiva. ¿Continuar?`
+        `Vas a avanzar a la Semana ${nextWeek} de ${mesocycleTargetWeeks} de tu mesociclo: se desmarcarán los ejercicios para iniciar el nuevo microciclo, pero tus pesos y repeticiones se mantendrán intactos para aplicar sobrecarga progresiva. ¿Continuar?`
       )
     ) {
       setMesocycleWeek(nextWeek);
@@ -558,8 +572,104 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
         localStorage.setItem(`fit_gen_${nickname}_weekly_mesocycle_current_week`, String(nextWeek));
       } catch (e) {}
       if (onNotification) {
-        onNotification(`¡Semana ${nextWeek} iniciada! Tus pesos anteriores se conservan como referencia.`);
+        onNotification(`¡Semana ${nextWeek} de ${mesocycleTargetWeeks} iniciada! Tus pesos anteriores se conservan como referencia.`);
       }
+    }
+  };
+
+  // Opciones al completar el ciclo completo de N semanas
+  const handleStartSmartNextCycle = () => {
+    // Genera un nuevo ciclo rotando variantes de cada patrón pero conservando el historial de cargas
+    if (!weeklyRoutine) return;
+    const rotatedRoutine: WeeklyRoutine = {};
+    Object.keys(weeklyRoutine).forEach((dKey) => {
+      const dId = Number(dKey);
+      const day = weeklyRoutine[dId];
+      if (!day) return;
+      const newExercises = day.exercises.map((ex, idx) => {
+        const alts = getAlternativeWeeklyExercises(dId, idx, selectedLevel, routineFocus, routineDays);
+        const differentAlt = alts.find((a) => a.name !== ex.name);
+        return differentAlt || ex;
+      });
+      rotatedRoutine[dId] = {
+        ...day,
+        exercises: newExercises
+      };
+    });
+
+    setWeeklyRoutine(rotatedRoutine);
+    setMesocycleWeek(1);
+    const now = Date.now();
+    setWeeklyRoutineStartDate(now);
+    setWeeklyLogs((prev) => {
+      const reset: Record<string, { weight: string; reps: string; completed: boolean }> = {};
+      Object.keys(prev).forEach((k) => {
+        reset[k] = { ...prev[k], completed: false };
+      });
+      return reset;
+    });
+
+    if (user) {
+      updateUserProfileCloud(user.id, {
+        weekly_routine: rotatedRoutine,
+        weekly_start_date: now,
+        weekly_focus: routineFocus,
+        weekly_days: routineDays
+      } as any);
+    }
+
+    try {
+      localStorage.setItem(`fit_gen_${nickname}_weekly_start_date`, String(now));
+      localStorage.setItem(`fit_gen_${nickname}_weekly_routine_${selectedLevel}_v1`, JSON.stringify(rotatedRoutine));
+      localStorage.setItem(`fit_gen_${nickname}_weekly_mesocycle_current_week`, '1');
+    } catch (e) {}
+
+    setShowCycleCompleteModal(false);
+    if (onNotification) {
+      onNotification('🚀 ¡Nuevo ciclo inteligente generado! Se renovaron variantes de estímulo conservando tu historial de cargas.');
+    }
+  };
+
+  const handleRepeatSameCycleFromWeek1 = () => {
+    setMesocycleWeek(1);
+    setWeeklyLogs((prev) => {
+      const reset: Record<string, { weight: string; reps: string; completed: boolean }> = {};
+      Object.keys(prev).forEach((k) => {
+        reset[k] = { ...prev[k], completed: false };
+      });
+      return reset;
+    });
+    try {
+      localStorage.setItem(`fit_gen_${nickname}_weekly_mesocycle_current_week`, '1');
+    } catch (e) {}
+    setShowCycleCompleteModal(false);
+    if (onNotification) {
+      onNotification(`🔄 ¡Ciclo reiniciado en la Semana 1 de ${mesocycleTargetWeeks}! Tus cargas previas se mantienen como referencia a superar.`);
+    }
+  };
+
+  const handleExtendCurrentCycle = (extraWeeks: number) => {
+    const newTarget = mesocycleTargetWeeks + extraWeeks;
+    const nextW = mesocycleWeek + 1;
+    setMesocycleTargetWeeks(newTarget);
+    setMesocycleWeek(nextW);
+    setWeeklyLogs((prev) => {
+      const reset: Record<string, { weight: string; reps: string; completed: boolean }> = {};
+      Object.keys(prev).forEach((k) => {
+        reset[k] = { ...prev[k], completed: false };
+      });
+      return reset;
+    });
+    if (user) {
+      updateUserProfileCloud(user.id, { weekly_target_weeks: newTarget });
+    }
+    try {
+      localStorage.setItem(`fit_gen_${nickname}_weekly_mesocycle_target_weeks`, String(newTarget));
+      localStorage.setItem(`fit_gen_${nickname}_weekly_mesocycle_current_week`, String(nextW));
+    } catch (e) {}
+    setShowCycleCompleteModal(false);
+    if (onNotification) {
+      onNotification(`➕ Ciclo extendido a ${newTarget} semanas. ¡Iniciando Semana ${nextW} de ${newTarget}!`);
     }
   };
 
@@ -887,7 +997,11 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
                   className="w-full text-left px-3 py-2 text-xs font-semibold hover:bg-[#15181D] rounded-xl text-[#F4F2ED] flex items-center gap-2 cursor-pointer"
                 >
                   <ChevronRight className="w-3.5 h-3.5 text-blue-400" />
-                  <span>Pasar a la semana siguiente</span>
+                  <span>
+                    {mesocycleWeek >= mesocycleTargetWeeks
+                      ? `Finalizar ciclo de ${mesocycleTargetWeeks} semanas 🏆`
+                      : 'Pasar a la semana siguiente'}
+                  </span>
                 </button>
               </div>
             )}
@@ -907,6 +1021,30 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
             />
           </div>
         </div>
+
+        {/* Banner cuando está en la última semana del mesociclo */}
+        {mesocycleWeek >= mesocycleTargetWeeks && (
+          <div className="mt-4 bg-gradient-to-r from-[#1FD08A]/15 via-[#5B8DEF]/15 to-[#1FD08A]/10 border border-[#1FD08A]/40 rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <Trophy className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-black text-white">
+                  ¡Estás en la Semana {mesocycleTargetWeeks} de {mesocycleTargetWeeks} (Última semana de tu ciclo)!
+                </p>
+                <p className="text-[11px] text-[#A8B0BB] mt-0.5">
+                  Al terminar esta semana cerramos tu mesociclo para evaluar tus marcas y decidir tu próximo bloque.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowCycleCompleteModal(true)}
+              className="px-3.5 py-2 rounded-xl bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs shrink-0 transition-all cursor-pointer shadow-md"
+            >
+              🏆 Cerrar Ciclo / Elegir Siguiente Paso
+            </button>
+          </div>
+        )}
       </div>
 
       {/* TARJETA DEL DÍA ACTIVO Y ACCIÓN PRINCIPAL */}
@@ -1449,10 +1587,16 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
 
         <button
           onClick={handleResetWeeklyProgress}
-          className="bg-[#20252C] hover:bg-[#282F38] text-[#5B8DEF] border border-[#282F38] font-bold py-3.5 px-4 rounded-2xl transition-all text-xs cursor-pointer"
-          title="Desmarca los ejercicios completados pero conserva tus pesos para la siguiente semana"
+          className={`${
+            mesocycleWeek >= mesocycleTargetWeeks
+              ? 'bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] border-[#1FD08A] font-black shadow-lg'
+              : 'bg-[#20252C] hover:bg-[#282F38] text-[#5B8DEF] border-[#282F38] font-bold'
+          } border py-3.5 px-4 rounded-2xl transition-all text-xs cursor-pointer`}
+          title="Avanza de semana o cierra el ciclo actual al llegar a la meta"
         >
-          Pasar a la semana siguiente
+          {mesocycleWeek >= mesocycleTargetWeeks
+            ? `🏆 Finalizar ciclo (${mesocycleTargetWeeks} sem)`
+            : 'Pasar a la semana siguiente'}
         </button>
 
         <button
@@ -1464,6 +1608,130 @@ export default function WeeklyModule({ nickname, selectedLevel, onNotification }
           <span>Crear bloque nuevo</span>
         </button>
       </div>
+
+      {/* MODAL DE FELICITACIÓN Y FIN DE CICLO (MESOCICLO COMPLETADO) */}
+      {showCycleCompleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#20252C] rounded-3xl p-6 max-w-lg w-full border border-[#1FD08A]/40 shadow-2xl text-[#F4F2ED] space-y-5 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-start justify-between gap-3 border-b border-[#282F38] pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-amber-400/15 border border-amber-400/40 flex items-center justify-center text-amber-400 shrink-0">
+                  <Trophy className="w-6 h-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A] bg-[#1FD08A]/15 px-2.5 py-0.5 rounded-full">
+                    Mesociclo Completado · {mesocycleTargetWeeks} Semanas
+                  </span>
+                  <h3 className="text-lg font-black text-white mt-1">
+                    ¡Felicitaciones, {nickname}! 🎉
+                  </h3>
+                  <p className="text-xs text-[#A8B0BB]">
+                    Terminaste las {mesocycleTargetWeeks} semanas de tu bloque de entrenamiento.
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowCycleCompleteModal(false)}
+                className="p-1.5 hover:bg-[#15181D] rounded-xl text-[#A8B0BB] hover:text-white cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Métricas alcanzadas en este ciclo */}
+            {(() => {
+              const loggedKeys = Object.keys(weeklyLogs).filter(
+                (k) => k.startsWith(`${selectedLevel}_`) && (weeklyLogs[k]?.weight || weeklyLogs[k]?.completed)
+              );
+              const withWeight = loggedKeys.filter((k) => Number(weeklyLogs[k]?.weight) > 0);
+              return (
+                <div className="grid grid-cols-3 gap-2.5">
+                  <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3 text-center">
+                    <p className="text-[10px] font-bold text-[#A8B0BB] uppercase">Ciclo</p>
+                    <p className="text-base font-black text-[#1FD08A] font-mono mt-0.5">
+                      {mesocycleTargetWeeks} sem
+                    </p>
+                    <p className="text-[10px] text-[#717885]">{totalSessionsInMesocycle} sesiones</p>
+                  </div>
+                  <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3 text-center">
+                    <p className="text-[10px] font-bold text-[#A8B0BB] uppercase">Cargas medidas</p>
+                    <p className="text-base font-black text-[#5B8DEF] font-mono mt-0.5">
+                      {withWeight.length}
+                    </p>
+                    <p className="text-[10px] text-[#717885]">ejercicios con peso</p>
+                  </div>
+                  <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3 text-center">
+                    <p className="text-[10px] font-bold text-[#A8B0BB] uppercase">Frecuencia</p>
+                    <p className="text-base font-black text-amber-400 font-mono mt-0.5">
+                      {routineDays} días/sem
+                    </p>
+                    <p className="text-[10px] text-[#717885]">{routineFocus === 'glutes' ? 'Glúteos/Pierna' : 'Torso/Pierna'}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Explicación fisiológica profesional */}
+            <div className="bg-[#15181D] border border-[#5B8DEF]/30 rounded-2xl p-3.5 text-xs text-[#A8B0BB] space-y-1.5">
+              <p className="font-black text-[#5B8DEF] flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4" />
+                <span>¿Qué se recomienda científicamente al terminar un ciclo?</span>
+              </p>
+              <p className="leading-relaxed">
+                Tras <strong>{mesocycleTargetWeeks} semanas</strong> repitiendo los mismos ejercicios, tu sistema nervioso y articular acumula fatiga y el estímulo empieza a estancarse (ley de rendimientos decrecientes). Por eso la app no sigue infinitamente a la semana {mesocycleTargetWeeks + 1}, sino que te permite elegir tu siguiente fase:
+              </p>
+            </div>
+
+            {/* 3 Opciones de Decisión del Atleta */}
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                onClick={handleStartSmartNextCycle}
+                className="w-full text-left p-4 rounded-2xl bg-[#1FD08A]/15 hover:bg-[#1FD08A]/25 border-2 border-[#1FD08A] transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-[#1FD08A] text-[#15181D] px-2 py-0.5 rounded-md">
+                    ⭐ Recomendado por el Coach
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-[#1FD08A] group-hover:translate-x-1 transition-transform" />
+                </div>
+                <p className="text-sm font-black text-white mt-1.5">
+                  1. Generar Nuevo Ciclo Sugerido según mis Métricas
+                </p>
+                <p className="text-[11px] text-[#A8B0BB] mt-0.5 leading-snug">
+                  Rota las variantes de ejercicios para renovar el estímulo muscular, conserva tu historial de pesos logrados e inicia un nuevo bloque en la <strong>Semana 1 de {mesocycleTargetWeeks}</strong>.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleRepeatSameCycleFromWeek1}
+                className="w-full text-left p-4 rounded-2xl bg-[#15181D] hover:bg-[#282F38] border border-[#282F38] hover:border-[#5B8DEF]/50 transition-all cursor-pointer"
+              >
+                <p className="text-sm font-black text-white">
+                  2. Repetir este mismo Ciclo desde la Semana 1
+                </p>
+                <p className="text-[11px] text-[#A8B0BB] mt-0.5 leading-snug">
+                  Mantiene exactamente los mismos ejercicios actuales y tus pesos registrados como base para que busques superar tus marcas en un nuevo ciclo de {mesocycleTargetWeeks} semanas.
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleExtendCurrentCycle(4)}
+                className="w-full text-left p-4 rounded-2xl bg-[#15181D] hover:bg-[#282F38] border border-[#282F38] hover:border-amber-400/50 transition-all cursor-pointer"
+              >
+                <p className="text-sm font-black text-white">
+                  3. Continuar este ciclo (+4 semanas adicionales)
+                </p>
+                <p className="text-[11px] text-[#A8B0BB] mt-0.5 leading-snug">
+                  Si sientes que aún estás subiendo cargas sin fatiga articular, amplía este bloque a {mesocycleTargetWeeks + 4} semanas y pasa a la Semana {mesocycleTargetWeeks + 1}.
+                </p>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL PARA EDITAR PLAN */}
       {showEditPlanModal && (

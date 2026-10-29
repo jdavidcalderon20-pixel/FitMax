@@ -136,11 +136,42 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     setCoachAssignments(getCoachAssignedRoutines());
   }, [nickname, operatingMode]);
 
+  // Función auxiliar para limpiar cualquier rastro antiguo de "OCR" guardado en localStorage
+  const sanitizeSquadData = (list: Squad[]): Squad[] => {
+    return list.map((sq) => {
+      const cleanName = sq.name.replace(/Hyrox\s*&\s*OCR/gi, 'Hyrox & Funcional').replace(/\bOCR\b/gi, 'Funcional');
+      const cleanMotto = sq.motto.replace(/obstáculo/gi, 'estación');
+      let cleanRoutine = sq.sharedRoutine;
+      if (cleanRoutine) {
+        cleanRoutine = {
+          ...cleanRoutine,
+          targetWeeks: cleanRoutine.targetWeeks || 4,
+          cycleLabel: cleanRoutine.cycleLabel || `${cleanRoutine.targetWeeks || 4} semanas`,
+          daysData: (cleanRoutine.daysData || []).map((d) => {
+            if (/OCR|Suspensiones/i.test(d.title)) {
+              return {
+                ...d,
+                title: 'Día 2: Potencia de Pierna, Carries & Wall Balls',
+                exercises: [
+                  { name: 'Wall Balls (Lanzamiento de Balón)', sets: 4, reps: '25 reps' },
+                  { name: 'Remo Ergómetro (Rowing) + 1km Carrera', sets: 4, reps: '500m' },
+                  { name: 'Farmers Carry Pesados (Mancuernas/Kettlebells)', sets: 4, reps: '100m' },
+                ],
+              };
+            }
+            return d;
+          }),
+        };
+      }
+      return { ...sq, name: cleanName, motto: cleanMotto, sharedRoutine: cleanRoutine };
+    });
+  };
+
   // Lista de combos guardados localmente
   const [squads, setSquads] = useState<Squad[]>(() => {
     try {
       const saved = localStorage.getItem(`fit_gen_${nickname}_squads_v1`);
-      return saved ? JSON.parse(saved) : DEFAULT_COMMUNITY_SQUADS;
+      return saved ? sanitizeSquadData(JSON.parse(saved)) : DEFAULT_COMMUNITY_SQUADS;
     } catch {
       return DEFAULT_COMMUNITY_SQUADS;
     }
@@ -157,24 +188,36 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
   const [members, setMembers] = useState<Record<string, SquadMember[]>>(() => {
     try {
       const saved = localStorage.getItem(`fit_gen_${nickname}_squad_members_v1`);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<string, SquadMember[]>;
+        Object.keys(parsed).forEach((k) => {
+          parsed[k] = (parsed[k] || []).map((m) => ({
+            ...m,
+            nickname: m.nickname.replace(/Lucas_OCR/gi, 'Lucas_Hyrox'),
+            lastActivityText: m.lastActivityText
+              ? m.lastActivityText.replace(/Agarre OCR:\s*4x60s Cuelgues/gi, 'Estaciones Hyrox: Wall Balls & Carries')
+              : m.lastActivityText,
+          }));
+        });
+        return parsed;
+      }
     } catch {}
 
     return {
       squad_hyrox_titans: [
         { id: 'm1', squadId: 'squad_hyrox_titans', nickname: 'Coach_Marcos', role: 'leader', joinedAt: Date.now() - 86400000 * 14, lastCheckinAt: Date.now(), lastActivityText: 'Simulacro Hyrox: Sled Push + 1km', streakDays: 12, hasCheckedInToday: true },
-        { id: 'm2', squadId: 'squad_hyrox_titans', nickname, role: 'member', joinedAt: Date.now() - 86400000 * 3, lastCheckinAt: Date.now() - 86400000, lastActivityText: 'Agarre OCR: 4x60s Cuelgues', streakDays: 3, hasCheckedInToday: false },
-        { id: 'm3', squadId: 'squad_hyrox_titans', nickname: 'Lucas_OCR', role: 'member', joinedAt: Date.now() - 86400000 * 10, lastCheckinAt: Date.now(), lastActivityText: 'Compromised Running 5K', streakDays: 7, hasCheckedInToday: true },
+        { id: 'm2', squadId: 'squad_hyrox_titans', nickname, role: 'admin', joinedAt: Date.now() - 86400000 * 3, lastCheckinAt: Date.now() - 86400000, lastActivityText: 'Estaciones Hyrox: Wall Balls & Carries', streakDays: 3, hasCheckedInToday: false },
+        { id: 'm3', squadId: 'squad_hyrox_titans', nickname: 'Lucas_Hyrox', role: 'member', joinedAt: Date.now() - 86400000 * 10, lastCheckinAt: Date.now(), lastActivityText: 'Compromised Running 5K', streakDays: 7, hasCheckedInToday: true },
         { id: 'm4', squadId: 'squad_hyrox_titans', nickname: 'Andrea_Fit', role: 'member', joinedAt: Date.now() - 86400000 * 8, lastCheckinAt: Date.now() - 86400000 * 2, lastActivityText: 'Burpees + Farmer Walks', streakDays: 1, hasCheckedInToday: false }
       ],
       squad_polar_runners: [
         { id: 'm5', squadId: 'squad_polar_runners', nickname: 'Elena_Run', role: 'leader', joinedAt: Date.now() - 86400000 * 20, lastCheckinAt: Date.now(), lastActivityText: 'Rodaje Z2 12 km @ 5:30/km', streakDays: 18, hasCheckedInToday: true },
-        { id: 'm6', squadId: 'squad_polar_runners', nickname, role: 'member', joinedAt: Date.now() - 86400000 * 2, lastCheckinAt: undefined, streakDays: 0, hasCheckedInToday: false },
+        { id: 'm6', squadId: 'squad_polar_runners', nickname, role: 'admin', joinedAt: Date.now() - 86400000 * 2, lastCheckinAt: undefined, streakDays: 0, hasCheckedInToday: false },
         { id: 'm7', squadId: 'squad_polar_runners', nickname: 'Martin_Marathon', role: 'member', joinedAt: Date.now() - 86400000 * 15, lastCheckinAt: Date.now(), lastActivityText: 'Series 6x1000m @ 4:10/km', streakDays: 9, hasCheckedInToday: true }
       ],
       squad_hypertrophy_brotherhood: [
         { id: 'm8', squadId: 'squad_hypertrophy_brotherhood', nickname: 'Carlos_Lift', role: 'leader', joinedAt: Date.now() - 86400000 * 30, lastCheckinAt: Date.now(), lastActivityText: 'Torso Hipertrofia A (RIR 1)', streakDays: 15, hasCheckedInToday: true },
-        { id: 'm9', squadId: 'squad_hypertrophy_brotherhood', nickname, role: 'member', joinedAt: Date.now() - 86400000 * 1, lastCheckinAt: undefined, streakDays: 0, hasCheckedInToday: false }
+        { id: 'm9', squadId: 'squad_hypertrophy_brotherhood', nickname, role: 'admin', joinedAt: Date.now() - 86400000 * 1, lastCheckinAt: undefined, streakDays: 0, hasCheckedInToday: false }
       ]
     };
   });
@@ -189,7 +232,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     return {
       squad_hyrox_titans: [
         { id: 'c1', squadId: 'squad_hyrox_titans', nickname: 'Coach_Marcos', activityType: 'hyrox_ocr', activityTitle: 'Simulacro Hyrox: Sled Push + 1km', details: 'Ronda de 4 estaciones completadas en 28 min.', createdAt: Date.now() - 3600000 * 2 },
-        { id: 'c2', squadId: 'squad_hyrox_titans', nickname: 'Lucas_OCR', activityType: 'running', activityTitle: 'Compromised Running 5K', details: 'Piernas quemadas tras zancadas lastradas.', createdAt: Date.now() - 3600000 * 5 }
+        { id: 'c2', squadId: 'squad_hyrox_titans', nickname: 'Lucas_Hyrox', activityType: 'running', activityTitle: 'Compromised Running 5K', details: 'Piernas quemadas tras zancadas lastradas.', createdAt: Date.now() - 3600000 * 5 }
       ],
       squad_polar_runners: [
         { id: 'c3', squadId: 'squad_polar_runners', nickname: 'Elena_Run', activityType: 'running', activityTitle: 'Rodaje Z2 12 km @ 5:30/km', details: 'Pulsaciones estables en 138 ppm.', createdAt: Date.now() - 3600000 * 3 }
@@ -204,7 +247,18 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
   const [posts, setPosts] = useState<Record<string, SquadPost[]>>(() => {
     try {
       const saved = localStorage.getItem(`fit_gen_${nickname}_squad_posts_v1`);
-      if (saved) return JSON.parse(saved);
+      if (saved) {
+        const parsed = JSON.parse(saved) as Record<string, SquadPost[]>;
+        Object.keys(parsed).forEach((k) => {
+          parsed[k] = (parsed[k] || []).map((p) => ({
+            ...p,
+            nickname: p.nickname.replace(/Lucas_OCR/gi, 'Lucas_Hyrox'),
+            activityBadge: p.activityBadge ? p.activityBadge.replace(/Agarre OCR/gi, 'Estaciones Hyrox') : p.activityBadge,
+            content: p.content.replace(/cuelgues con toalla/gi, 'Wall Balls y Farmer Carry'),
+          }));
+        });
+        return parsed;
+      }
     } catch {}
     return DEFAULT_SQUAD_POSTS;
   });
@@ -222,10 +276,11 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
           squadId: 'squad_hyrox_titans',
           creatorNickname: 'Coach_Marcos',
           title: 'Simulacro Hyrox Completo al Aire Libre',
+          description: 'Haremos 4 estaciones de fuerza funcional + 4 bloques de 1km de carrera a ritmo constante. Llevar hidratación.',
           date: 'Sábado 18 de Octubre',
           time: '08:00 AM',
-          location: 'Parque El Virrey (Zona de barras)',
-          attendees: ['Coach_Marcos', 'Lucas_OCR', nickname],
+          location: 'Parque El Virrey (Zona funcional)',
+          attendees: ['Coach_Marcos', 'Lucas_Hyrox', nickname],
           declined: ['Andrea_Fit'],
           createdAt: Date.now() - 86400000 * 2
         }
@@ -236,6 +291,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
           squadId: 'squad_polar_runners',
           creatorNickname: 'Elena_Run',
           title: 'Tirada Larga Dominical 16K en Z2',
+          description: 'Vamos a correr 16 km suaves a ritmo conversacional (5:45 - 6:10 min/km) dando dos vueltas completas al circuito.',
           date: 'Domingo 19 de Octubre',
           time: '06:30 AM',
           location: 'Entrada Principal Parque Simón Bolívar',
@@ -269,8 +325,19 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
   const [fullscreenImage, setFullscreenImage] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<boolean>(false);
 
+  // Ciclo sugerido para la rutina grupal (Líder / Admin)
+  const [selectedRoutineCycleWeeks, setSelectedRoutineCycleWeeks] = useState<number>(4);
+  const [selectedRoutineCycleLabel, setSelectedRoutineCycleLabel] = useState<string>('4 semanas');
+  const [showGroupRoutineBuilder, setShowGroupRoutineBuilder] = useState<boolean>(false);
+  const [groupRoutineTitle, setGroupRoutineTitle] = useState<string>('');
+  const [groupRoutineDesc, setGroupRoutineDesc] = useState<string>('');
+  const [groupRoutineDays, setGroupRoutineDays] = useState<
+    { dayId: number; title: string; exercises: { name: string; sets: number; reps: string }[] }[]
+  >([]);
+
   // Formulario de nueva quedada
   const [newMeetupTitle, setNewMeetupTitle] = useState('');
+  const [newMeetupDescription, setNewMeetupDescription] = useState('');
   const [newMeetupDate, setNewMeetupDate] = useState('');
   const [newMeetupTime, setNewMeetupTime] = useState('');
   const [newMeetupLocation, setNewMeetupLocation] = useState('');
@@ -357,9 +424,51 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
            userMemberInfo?.role === 'leader';
   }, [currentSquad, nickname, userMemberInfo]);
 
+  const isUserLeaderOrAdmin = useMemo(() => {
+    if (!currentSquad) return false;
+    return isUserCaptain || userMemberInfo?.role === 'admin';
+  }, [currentSquad, isUserCaptain, userMemberInfo]);
+
   const userHasCheckedInToday = useMemo(() => {
     return hasUserCheckedInToday(userMemberInfo?.lastCheckinAt);
   }, [userMemberInfo]);
+
+  // Resumen semanal real del atleta para la Tarjeta de Resumen Semanal
+  const athleteWeeklySummary = useMemo(() => {
+    let strengthCount = 0;
+    let runningKm = 0;
+    let runningSessions = 0;
+    const sevenDaysAgo = Date.now() - 7 * 86400000;
+
+    try {
+      const rawLogs = localStorage.getItem(`fit_gen_${nickname}_logs_v1`);
+      if (rawLogs) {
+        const parsed = JSON.parse(rawLogs);
+        if (Array.isArray(parsed)) {
+          strengthCount = parsed.filter((l: any) => (l.timestamp || l.date || Date.now()) >= sevenDaysAgo).length;
+        }
+      }
+    } catch {}
+
+    try {
+      const rawRun = localStorage.getItem(`fit_gen_${nickname}_running_logs_v1`);
+      if (rawRun) {
+        const parsedRun = JSON.parse(rawRun);
+        if (Array.isArray(parsedRun)) {
+          const recentRuns = parsedRun.filter((r: any) => (r.createdAt || Date.now()) >= sevenDaysAgo);
+          runningSessions = recentRuns.length;
+          runningKm = recentRuns.reduce((acc: number, r: any) => acc + (Number(r.distanceKm) || 0), 0);
+        }
+      }
+    } catch {}
+
+    const totalSessions = Math.max(1, strengthCount + runningSessions + (userHasCheckedInToday ? 1 : 0));
+    return {
+      totalSessions,
+      runningKm: Number(runningKm.toFixed(1)),
+      streakDays: Math.max(1, userMemberInfo?.streakDays || 1),
+    };
+  }, [nickname, userMemberInfo, userHasCheckedInToday]);
 
   // Quiénes entrenaron hoy en este combo
   const whoTrainedToday = useMemo(() => {
@@ -387,7 +496,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
       case 'running':
         return 'Running';
       case 'hyrox_ocr':
-        return 'Hyrox / OCR';
+        return 'Hyrox & Funcional';
       default:
         return 'Híbrido';
     }
@@ -581,6 +690,31 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     }
   };
 
+  // Asignar o retirar rol de Administrador (Líder / Capitán)
+  const handleToggleAdminRole = (memberNickname: string) => {
+    if (!currentSquad) return;
+    playBeepSound();
+    setMembers((prev) => {
+      const list = prev[currentSquad.id] || [];
+      const updated = list.map((m) => {
+        if (m.nickname.toLowerCase() === memberNickname.toLowerCase()) {
+          if (m.role === 'leader') return m;
+          const nextRole: SquadMember['role'] = m.role === 'admin' ? 'member' : 'admin';
+          if (onNotification) {
+            onNotification(
+              nextRole === 'admin'
+                ? `🛡️ ${m.nickname} ahora es Administrador del grupo y puede gestionar rutinas.`
+                : `${m.nickname} volvió al rol de miembro.`
+            );
+          }
+          return { ...m, role: nextRole };
+        }
+        return m;
+      });
+      return { ...prev, [currentSquad.id]: updated };
+    });
+  };
+
   // Registrar check-in diario
   const handleRecordCheckin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -656,6 +790,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
       squadId: currentSquad.id,
       creatorNickname: nickname,
       title: newMeetupTitle.trim(),
+      description: newMeetupDescription.trim() || undefined,
       date: newMeetupDate.trim(),
       time: newMeetupTime.trim() || '08:00 AM',
       location: newMeetupLocation.trim(),
@@ -671,6 +806,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
 
     setShowNewMeetupModal(false);
     setNewMeetupTitle('');
+    setNewMeetupDescription('');
     setNewMeetupDate('');
     setNewMeetupTime('');
     setNewMeetupLocation('');
@@ -710,10 +846,13 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     const routine = currentSquad.sharedRoutine;
     playBeepSound();
 
+    const assignedWeeks = routine.targetWeeks || 4;
+    const assignedLabel = routine.cycleLabel || (assignedWeeks === 1 ? '1 semana / 1 día' : `${assignedWeeks} semanas`);
+
     const convertedDays = (routine.daysData || []).map((d, dIdx) => ({
       id: dIdx + 1,
       name: d.title || `Día ${dIdx + 1}`,
-      subtitle: `Compartida en ${currentSquad.name}`,
+      subtitle: `Compartida en ${currentSquad.name} · Ciclo: ${assignedLabel}`,
       exercises: (d.exercises || []).map((ex, eIdx) => ({
         id: `sq_ex_${Date.now()}_${dIdx}_${eIdx}`,
         name: ex.name,
@@ -726,8 +865,8 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
 
     saveCustomRoutine(nickname, {
       name: `${routine.title} (${currentSquad.name})`,
-      description: routine.description,
-      targetWeeks: 8,
+      description: `${routine.description} [Ciclo sugerido: ${assignedLabel}]`,
+      targetWeeks: assignedWeeks,
       days: convertedDays.length > 0 ? convertedDays : [
         {
           id: 1,
@@ -741,20 +880,102 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
 
     setMyCustomRoutines(getCustomRoutines(nickname));
     if (onNotification) {
-      onNotification(`¡Rutina "${routine.title}" guardada en tus Rutinas Personalizadas! Ve a Entrenar → Rutina personalizada para iniciarla.`);
+      onNotification(`¡Rutina "${routine.title}" guardada con su ciclo de ${assignedLabel} en tus Rutinas Personalizadas!`);
+    }
+  };
+
+  // Actualizar el ciclo sugerido de la rutina actual del grupo (Líder o Administrador)
+  const handleUpdateGroupRoutineCycle = (weeks: number, label: string) => {
+    if (!currentSquad || !currentSquad.sharedRoutine) return;
+    setSelectedRoutineCycleWeeks(weeks);
+    setSelectedRoutineCycleLabel(label);
+    setSquads((prev) =>
+      prev.map((sq) =>
+        sq.id === currentSquad.id && sq.sharedRoutine
+          ? {
+              ...sq,
+              sharedRoutine: {
+                ...sq.sharedRoutine,
+                targetWeeks: weeks,
+                cycleLabel: label,
+              },
+            }
+          : sq
+      )
+    );
+    playBeepSound();
+    if (onNotification) {
+      onNotification(`🗓️ Ciclo sugerido de la rutina del grupo actualizado a: ${label}.`);
+    }
+  };
+
+  // Abrir editor de la rutina oficial del grupo (Líder / Admin)
+  const handleOpenGroupRoutineBuilder = () => {
+    if (!currentSquad) return;
+    const existing = currentSquad.sharedRoutine;
+    setGroupRoutineTitle(existing?.title || `Plan Oficial ${currentSquad.name}`);
+    setGroupRoutineDesc(existing?.description || 'Rutina estructurada por el Líder/Admin para todos los miembros del grupo.');
+    setSelectedRoutineCycleWeeks(existing?.targetWeeks || 4);
+    setSelectedRoutineCycleLabel(existing?.cycleLabel || '4 semanas');
+    setGroupRoutineDays(
+      existing?.daysData && existing.daysData.length > 0
+        ? existing.daysData.map((d) => ({
+            dayId: d.dayId,
+            title: d.title,
+            exercises: d.exercises.map((e) => ({ ...e })),
+          }))
+        : [
+            {
+              dayId: 1,
+              title: 'Día 1: Bloque Principal',
+              exercises: [
+                { name: 'Sentadilla trasera con barra', sets: 4, reps: '6-8 reps' },
+                { name: 'Press de banca con barra', sets: 4, reps: '6-8 reps' },
+              ],
+            },
+          ]
+    );
+    setShowGroupRoutineBuilder(true);
+  };
+
+  const handleSaveGroupRoutineBuilder = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentSquad || !groupRoutineTitle.trim()) return;
+    const payload: SharedRoutinePayload = {
+      title: groupRoutineTitle.trim(),
+      discipline: currentSquad.discipline,
+      description: groupRoutineDesc.trim() || `Ciclo sugerido: ${selectedRoutineCycleLabel}`,
+      authorNickname: nickname,
+      sharedAt: Date.now(),
+      type: 'weekly_4day',
+      targetWeeks: selectedRoutineCycleWeeks,
+      cycleLabel: selectedRoutineCycleLabel,
+      daysData: groupRoutineDays,
+    };
+    setSquads((prev) =>
+      prev.map((sq) => (sq.id === currentSquad.id ? { ...sq, sharedRoutine: payload } : sq))
+    );
+    setShowGroupRoutineBuilder(false);
+    playBeepSound();
+    if (onNotification) {
+      onNotification(`¡Rutina grupal "${payload.title}" (${selectedRoutineCycleLabel}) publicada por ${nickname}!`);
     }
   };
 
   // Compartir una de mis Rutinas Personalizadas con el grupo actual
   const handleShareMyCustomRoutineToGroup = (customR: CustomRoutine) => {
     if (!currentSquad) return;
+    const weeks = customR.targetWeeks || selectedRoutineCycleWeeks || 4;
+    const label = weeks === 1 ? '1 semana / 1 solo día' : `${weeks} semanas`;
     const payload: SharedRoutinePayload = {
       title: customR.name,
       discipline: currentSquad.discipline,
-      description: customR.description || `Rutina de ${customR.targetWeeks} semanas compartida por ${nickname}`,
+      description: customR.description || `Rutina de ${label} compartida por ${nickname}`,
       authorNickname: nickname,
       sharedAt: Date.now(),
       type: 'weekly_4day',
+      targetWeeks: weeks,
+      cycleLabel: label,
       daysData: customR.days.map((d, idx) => ({
         dayId: idx + 1,
         title: d.name,
@@ -771,7 +992,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     );
     playBeepSound();
     if (onNotification) {
-      onNotification(`¡Compartiste tu rutina "${customR.name}" con el grupo "${currentSquad.name}"!`);
+      onNotification(`¡Publicaste "${customR.name}" (Ciclo: ${label}) como rutina del grupo "${currentSquad.name}"!`);
     }
   };
 
@@ -1858,51 +2079,306 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
         </div>
       )}
 
-      {/* 2. PESTAÑA: RUTINAS COMPARTIDAS */}
+      {/* 2. PESTAÑA: RUTINAS COMPARTIDAS (GESTIÓN POR LÍDER / ADMIN Y CICLO SUGERIDO) */}
       {activeSubTab === 'routine' && (
         <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-5 text-[#F4F2ED] space-y-4 shadow-xl">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A] block">
-                Plan de entrenamiento compartido con el grupo
-              </span>
+          <div className="flex items-start justify-between flex-wrap gap-3">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A]">
+                  Plan de entrenamiento oficial del grupo
+                </span>
+                <span className="px-2.5 py-0.5 rounded-full bg-[#5B8DEF]/20 border border-[#5B8DEF]/40 text-[#5B8DEF] text-[10px] font-black">
+                  🗓️ Ciclo sugerido: {currentSquad.sharedRoutine?.cycleLabel || `${currentSquad.sharedRoutine?.targetWeeks || 4} semanas`}
+                </span>
+                {currentSquad.sharedRoutine?.authorNickname && (
+                  <span className="text-[10px] text-[#A8B0BB]">
+                    Por <strong className="text-white">{currentSquad.sharedRoutine.authorNickname}</strong>
+                  </span>
+                )}
+              </div>
               <h3 className="text-base sm:text-lg font-black text-[#F4F2ED]">
                 {currentSquad.sharedRoutine?.title || 'Rutina del grupo'}
               </h3>
-              <p className="text-xs text-[#A8B0BB] mt-0.5">
+              <p className="text-xs text-[#A8B0BB]">
                 {currentSquad.sharedRoutine?.description || 'Rutina diseñada y compartida para el equipo.'}
               </p>
             </div>
 
-            <button
-              onClick={handleCopyRoutineToWeekly}
-              className="px-4 py-2.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
-            >
-              <Download className="w-4 h-4" />
-              <span>Guardar en mis Rutinas Personalizadas</span>
-            </button>
+            <div className="flex flex-wrap items-center gap-2">
+              {isUserLeaderOrAdmin && (
+                <button
+                  type="button"
+                  onClick={handleOpenGroupRoutineBuilder}
+                  className="px-3.5 py-2.5 bg-[#15181D] hover:bg-[#282F38] text-[#5B8DEF] border border-[#5B8DEF]/40 font-black text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Edit3 className="w-3.5 h-3.5" />
+                  <span>Diseñar / Editar rutina del grupo</span>
+                </button>
+              )}
+              <button
+                onClick={handleCopyRoutineToWeekly}
+                className="px-4 py-2.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
+              >
+                <Download className="w-4 h-4" />
+                <span>Guardar en mis Rutinas Personalizadas</span>
+              </button>
+            </div>
           </div>
 
-          {/* Compartir una de mis rutinas personalizadas en el grupo */}
-          {myCustomRoutines.length > 0 && (
-            <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-black text-[#F4F2ED]">¿Quieres compartir tu propia rutina con este grupo?</p>
-                <p className="text-[11px] text-[#A8B0BB]">Selecciona una de tus Rutinas Personalizadas para publicarla en el grupo:</p>
+          {/* PANEL DE LÍDER / ADMINISTRADOR: ELEGIR CICLO DE SEMANAS Y PUBLICAR RUTINA */}
+          {isUserLeaderOrAdmin && (
+            <div className="bg-[#15181D] border border-[#5B8DEF]/30 rounded-2xl p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-[#5B8DEF] shrink-0" />
+                  <div>
+                    <p className="text-xs font-black text-white">
+                      Panel de Líder / Administrador del Grupo
+                    </p>
+                    <p className="text-[11px] text-[#A8B0BB]">
+                      Define por cuánto tiempo (1 solo día o varias semanas) sugieres que el grupo realice esta rutina:
+                    </p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { weeks: 1, label: '1 solo día' },
+                    { weeks: 1, label: '1 semana' },
+                    { weeks: 2, label: '2 semanas' },
+                    { weeks: 4, label: '4 semanas' },
+                    { weeks: 8, label: '8 semanas' },
+                    { weeks: 12, label: '12 semanas' },
+                  ].map((opt) => {
+                    const activeLabel = currentSquad.sharedRoutine?.cycleLabel || `${currentSquad.sharedRoutine?.targetWeeks || 4} semanas`;
+                    const isSelected = activeLabel === opt.label;
+                    return (
+                      <button
+                        key={opt.label}
+                        type="button"
+                        onClick={() => handleUpdateGroupRoutineCycle(opt.weeks, opt.label)}
+                        className={`px-2.5 py-1 rounded-lg text-[11px] font-black border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#5B8DEF] border-[#5B8DEF] text-white'
+                            : 'bg-[#20252C] border-[#282F38] text-[#A8B0BB] hover:text-white'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {myCustomRoutines.map((r) => (
-                  <button
-                    key={r.id}
-                    type="button"
-                    onClick={() => handleShareMyCustomRoutineToGroup(r)}
-                    className="px-3 py-1.5 rounded-xl bg-[#20252C] hover:bg-[#1FD08A]/15 border border-[#282F38] hover:border-[#1FD08A]/40 text-[11px] font-bold text-[#F4F2ED] hover:text-[#1FD08A] transition-all cursor-pointer"
+
+              {myCustomRoutines.length > 0 && (
+                <div className="pt-2.5 border-t border-[#282F38] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <p className="text-[11px] text-[#A8B0BB]">
+                    O publica directamente una de tus <strong className="text-white">Rutinas Personalizadas</strong> como rutina oficial del grupo:
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {myCustomRoutines.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => handleShareMyCustomRoutineToGroup(r)}
+                        className="px-3 py-1.5 rounded-xl bg-[#20252C] hover:bg-[#1FD08A]/15 border border-[#282F38] hover:border-[#1FD08A]/40 text-[11px] font-bold text-[#F4F2ED] hover:text-[#1FD08A] transition-all cursor-pointer"
+                      >
+                        📤 Publicar "{r.name}" ({r.targetWeeks} sem)
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* EDITOR DIRECTO DE LA RUTINA DEL GRUPO (PARA LÍDER / ADMIN) */}
+          {showGroupRoutineBuilder && isUserLeaderOrAdmin && (
+            <form
+              onSubmit={handleSaveGroupRoutineBuilder}
+              className="bg-[#15181D] border-2 border-[#1FD08A]/50 rounded-2xl p-4 space-y-4 animate-fadeIn"
+            >
+              <div className="flex items-center justify-between border-b border-[#282F38] pb-2.5">
+                <h4 className="text-xs sm:text-sm font-black text-[#1FD08A] uppercase tracking-wider">
+                  ✏️ Editor de Rutina del Grupo (Líder / Admin)
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setShowGroupRoutineBuilder(false)}
+                  className="text-xs text-[#A8B0BB] hover:text-white cursor-pointer"
+                >
+                  Cerrar ✕
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="sm:col-span-2">
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Título de la rutina grupal</label>
+                  <input
+                    type="text"
+                    required
+                    value={groupRoutineTitle}
+                    onChange={(e) => setGroupRoutineTitle(e.target.value)}
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Ciclo sugerido</label>
+                  <select
+                    value={selectedRoutineCycleLabel}
+                    onChange={(e) => {
+                      const lbl = e.target.value;
+                      setSelectedRoutineCycleLabel(lbl);
+                      const num = parseInt(lbl, 10) || 1;
+                      setSelectedRoutineCycleWeeks(num);
+                    }}
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold"
                   >
-                    📤 Publicar "{r.name}"
+                    <option value="1 solo día">1 solo día (WOD / Reto puntual)</option>
+                    <option value="1 semana">1 semana</option>
+                    <option value="2 semanas">2 semanas</option>
+                    <option value="4 semanas">4 semanas</option>
+                    <option value="8 semanas">8 semanas</option>
+                    <option value="12 semanas">12 semanas</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Descripción o instrucciones para el grupo</label>
+                <input
+                  type="text"
+                  value={groupRoutineDesc}
+                  onChange={(e) => setGroupRoutineDesc(e.target.value)}
+                  className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-xs text-white"
+                />
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase text-[#1FD08A]">
+                    Días de la rutina ({groupRoutineDays.length})
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setGroupRoutineDays((prev) => [
+                        ...prev,
+                        {
+                          dayId: prev.length + 1,
+                          title: `Día ${prev.length + 1}: Sesiones del Grupo`,
+                          exercises: [{ name: 'Ejercicio grupal', sets: 4, reps: '8-10 reps' }],
+                        },
+                      ])
+                    }
+                    className="text-xs font-bold text-[#1FD08A] hover:underline cursor-pointer"
+                  >
+                    + Añadir día
                   </button>
+                </div>
+
+                {groupRoutineDays.map((gDay, dIdx) => (
+                  <div key={dIdx} className="bg-[#20252C] border border-[#282F38] rounded-xl p-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <input
+                        type="text"
+                        value={gDay.title}
+                        onChange={(e) => {
+                          const next = [...groupRoutineDays];
+                          next[dIdx] = { ...next[dIdx], title: e.target.value };
+                          setGroupRoutineDays(next);
+                        }}
+                        className="bg-[#15181D] border border-[#282F38] rounded-lg px-2.5 py-1 text-white font-black text-xs flex-1"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const next = [...groupRoutineDays];
+                          next[dIdx] = {
+                            ...next[dIdx],
+                            exercises: [...next[dIdx].exercises, { name: 'Nuevo ejercicio', sets: 4, reps: '10 reps' }],
+                          };
+                          setGroupRoutineDays(next);
+                        }}
+                        className="text-[11px] font-bold text-[#5B8DEF] hover:underline cursor-pointer"
+                      >
+                        + Ejercicio
+                      </button>
+                      {groupRoutineDays.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setGroupRoutineDays((prev) => prev.filter((_, i) => i !== dIdx))}
+                          className="text-zinc-500 hover:text-rose-400 p-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {gDay.exercises.map((ex, eIdx) => (
+                        <div key={eIdx} className="flex items-center gap-2 bg-[#15181D] p-2 rounded-lg border border-[#282F38]">
+                          <input
+                            type="text"
+                            value={ex.name}
+                            onChange={(e) => {
+                              const next = [...groupRoutineDays];
+                              const exs = [...next[dIdx].exercises];
+                              exs[eIdx] = { ...exs[eIdx], name: e.target.value };
+                              next[dIdx] = { ...next[dIdx], exercises: exs };
+                              setGroupRoutineDays(next);
+                            }}
+                            className="flex-1 bg-transparent text-white font-bold text-xs outline-none"
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            max={15}
+                            value={ex.sets}
+                            onChange={(e) => {
+                              const next = [...groupRoutineDays];
+                              const exs = [...next[dIdx].exercises];
+                              exs[eIdx] = { ...exs[eIdx], sets: parseInt(e.target.value, 10) || 4 };
+                              next[dIdx] = { ...next[dIdx], exercises: exs };
+                              setGroupRoutineDays(next);
+                            }}
+                            className="w-12 bg-[#20252C] border border-[#282F38] rounded px-1.5 py-1 text-center text-xs text-white font-bold"
+                          />
+                          <input
+                            type="text"
+                            value={ex.reps}
+                            onChange={(e) => {
+                              const next = [...groupRoutineDays];
+                              const exs = [...next[dIdx].exercises];
+                              exs[eIdx] = { ...exs[eIdx], reps: e.target.value };
+                              next[dIdx] = { ...next[dIdx], exercises: exs };
+                              setGroupRoutineDays(next);
+                            }}
+                            className="w-24 bg-[#20252C] border border-[#282F38] rounded px-2 py-1 text-center text-xs text-white font-bold"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGroupRoutineBuilder(false)}
+                  className="px-4 py-2 rounded-xl bg-[#20252C] text-[#A8B0BB] text-xs font-bold cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs cursor-pointer"
+                >
+                  Publicar rutina en el grupo
+                </button>
+              </div>
+            </form>
           )}
 
           {/* Días y ejercicios de la rutina */}
@@ -1926,13 +2402,18 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
         </div>
       )}
 
-      {/* 3. PESTAÑA: EQUIPO (ROSTER DE MIEMBROS) */}
+      {/* 3. PESTAÑA: EQUIPO (ROSTER DE MIEMBROS CON ROLES DE LÍDER Y ADMIN) */}
       {activeSubTab === 'roster' && (
         <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-5 text-[#F4F2ED] space-y-4 shadow-xl">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm sm:text-base font-black text-[#F4F2ED]">
-              Miembros de {currentSquad.name} ({currentMembers.length})
-            </h3>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <h3 className="text-sm sm:text-base font-black text-[#F4F2ED]">
+                Miembros de {currentSquad.name} ({currentMembers.length})
+              </h3>
+              <p className="text-[11px] text-[#A8B0BB]">
+                El <strong>👑 Líder</strong> y los <strong>🛡️ Administradores</strong> pueden crear, editar y asignar el ciclo de la rutina del grupo.
+              </p>
+            </div>
             <button
               onClick={() => setShowJoinModal(true)}
               className="text-xs text-[#1FD08A] font-bold hover:underline cursor-pointer flex items-center gap-1"
@@ -1945,12 +2426,13 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
           <div className="space-y-2">
             {currentMembers.map((member) => {
               const isLead = member.role === 'leader';
+              const isAdmin = member.role === 'admin';
               const hasChecked = hasUserCheckedInToday(member.lastCheckinAt);
 
               return (
                 <div 
                   key={member.id}
-                  className="bg-[#15181D] border border-[#282F38] p-3 rounded-2xl flex items-center justify-between gap-3"
+                  className="bg-[#15181D] border border-[#282F38] p-3 rounded-2xl flex items-center justify-between gap-3 flex-wrap"
                 >
                   <div className="flex items-center gap-3">
                     <div 
@@ -1960,11 +2442,16 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
                       {member.nickname.slice(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <p className="text-xs sm:text-sm font-black text-[#F4F2ED]">{member.nickname}</p>
                         {isLead && (
                           <span className="text-[10px] text-amber-300 font-bold bg-amber-400/20 px-1.5 py-0.5 rounded">
-                            👑 Capitán
+                            👑 Líder
+                          </span>
+                        )}
+                        {isAdmin && (
+                          <span className="text-[10px] text-[#5B8DEF] font-bold bg-[#5B8DEF]/20 border border-[#5B8DEF]/40 px-1.5 py-0.5 rounded">
+                            🛡️ Admin
                           </span>
                         )}
                       </div>
@@ -1979,6 +2466,17 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
                       <span className="w-3 h-3 rounded-full bg-[#1FD08A]" title="Entrenó hoy" />
                     ) : (
                       <span className="w-3 h-3 rounded-full bg-[#A8B0BB]/30" title="Pendiente de entrenar hoy" />
+                    )}
+
+                    {isUserLeaderOrAdmin && !isLead && (
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAdminRole(member.nickname)}
+                        className="px-2.5 py-1 rounded-lg bg-[#20252C] hover:bg-[#282F38] border border-[#282F38] text-[10px] font-bold text-[#5B8DEF] transition-colors cursor-pointer"
+                        title="Asignar o quitar permisos de Administrador de rutinas"
+                      >
+                        {isAdmin ? 'Quitar Admin' : '🛡️ Hacer Admin'}
+                      </button>
                     )}
 
                     {isUserCaptain && member.nickname.toLowerCase() !== nickname.toLowerCase() && (
@@ -2082,6 +2580,14 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
                           <MapPin className="w-3.5 h-3.5 text-red-400 shrink-0" />
                           <span>{meet.location}</span>
                         </p>
+                        {meet.description && (
+                          <div className="mt-2 bg-[#20252C] border border-[#282F38] rounded-xl p-2.5 text-xs text-zinc-200 leading-relaxed">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-[#5B8DEF] block mb-0.5">
+                              📋 Plan / Nota de la quedada:
+                            </span>
+                            {meet.description}
+                          </div>
+                        )}
                       </div>
 
                       {/* Asistentes */}
@@ -2193,7 +2699,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
                   {[
                     { id: 'strength', label: 'Musculación' },
                     { id: 'running', label: 'Running' },
-                    { id: 'hyrox_ocr', label: 'Hyrox / OCR' },
+                    { id: 'hyrox_ocr', label: 'Hyrox & Funcional' },
                     { id: 'hiit', label: 'HIIT / Cardio' }
                   ].map((t) => (
                     <button
@@ -2250,12 +2756,17 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
         </div>
       )}
 
-      {/* MODAL TARJETA DE RESUMEN COMPARTIBLE */}
+      {/* MODAL TARJETA DE RESUMEN SEMANAL COMPARTIBLE */}
       {showShareCardModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-[#20252C] border border-[#282F38] rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
-            <div className="flex justify-between items-center">
-              <h3 className="text-base font-black text-[#F4F2ED]">Tarjeta de resumen</h3>
+            <div className="flex justify-between items-start text-left">
+              <div>
+                <h3 className="text-base font-black text-[#F4F2ED]">Tarjeta de Resumen Semanal</h3>
+                <p className="text-[11px] text-[#A8B0BB] mt-0.5">
+                  Comparte tu constancia, racha y entrenamientos de la semana en el muro del grupo o por WhatsApp.
+                </p>
+              </div>
               <button 
                 onClick={() => setShowShareCardModal(false)}
                 className="p-1.5 text-[#A8B0BB] hover:text-[#F4F2ED] rounded-xl hover:bg-[#15181D]"
@@ -2276,14 +2787,22 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
                 <p className="text-base font-black text-[#F4F2ED]">{nickname}</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#282F38]">
+              <div className="grid grid-cols-2 gap-2.5 pt-2 border-t border-[#282F38]">
                 <div>
                   <p className="text-[10px] text-[#A8B0BB]">Disciplina</p>
                   <p className="text-xs font-bold text-[#1FD08A]">{getDisciplineName(currentSquad.discipline)}</p>
                 </div>
                 <div>
                   <p className="text-[10px] text-[#A8B0BB]">Racha activa</p>
-                  <p className="text-xs font-bold text-[#FB923C]">{userMemberInfo?.streakDays || 1} días 🔥</p>
+                  <p className="text-xs font-bold text-[#FB923C]">{athleteWeeklySummary.streakDays} días 🔥</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#A8B0BB]">Sesiones (7 días)</p>
+                  <p className="text-xs font-bold text-white">{athleteWeeklySummary.totalSessions} entrenos 💪</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-[#A8B0BB]">Distancia (7 días)</p>
+                  <p className="text-xs font-bold text-[#5B8DEF]">{athleteWeeklySummary.runningKm} km 🏃</p>
                 </div>
               </div>
             </div>
@@ -2291,12 +2810,29 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
             <div className="flex gap-2">
               <button
                 onClick={() => {
+                  const summaryPost: SquadPost = {
+                    id: `post_summary_${Date.now()}`,
+                    squadId: currentSquad.id,
+                    nickname,
+                    content: `📊 Resumen Semanal de ${nickname}: ${athleteWeeklySummary.totalSessions} sesiones completadas · ${athleteWeeklySummary.runningKm} km acumulados · Racha activa de ${athleteWeeklySummary.streakDays} días seguidos en ${getDisciplineName(currentSquad.discipline)} 🔥`,
+                    activityBadge: 'Resumen Semanal 🔥',
+                    discipline: currentSquad.discipline,
+                    reactions: { fire: 1, fist: 1, muscle: 1 },
+                    comments: [],
+                    createdAt: Date.now(),
+                  };
+                  setPosts((prev) => ({
+                    ...prev,
+                    [currentSquad.id]: [summaryPost, ...(prev[currentSquad.id] || [])],
+                  }));
                   setShowShareCardModal(false);
-                  if (onNotification) onNotification('¡Tarjeta publicada en tu muro!');
+                  setActiveSubTab('wall');
+                  playBeepSound();
+                  if (onNotification) onNotification('¡Tarjeta de Resumen Semanal publicada en el muro del grupo!');
                 }}
                 className="flex-1 py-3 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs transition-all cursor-pointer"
               >
-                Publicar en combo
+                Publicar en el muro del grupo
               </button>
               <button
                 onClick={() => {
@@ -2335,7 +2871,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Simulacro Hyrox en Parque Virrey"
+                  placeholder="Ej: Fondito 10K + Café o Simulacro Hyrox"
                   value={newMeetupTitle}
                   onChange={(e) => setNewMeetupTitle(e.target.value)}
                   className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
@@ -2376,6 +2912,19 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
                   value={newMeetupLocation}
                   onChange={(e) => setNewMeetupLocation(e.target.value)}
                   className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">
+                  Nota / ¿Qué vamos a hacer en la quedada?
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="Ej: Vamos a correr 10 km suaves por la ruta del parque a ritmo conversacional y luego estiramos..."
+                  value={newMeetupDescription}
+                  onChange={(e) => setNewMeetupDescription(e.target.value)}
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A] resize-none"
                 />
               </div>
 

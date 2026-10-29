@@ -452,6 +452,24 @@ export default function CustomRoutineModule({
                   type="button"
                   onClick={() => {
                     const prevProg = routineProgress[activeRoutine.id] || { currentWeek: 1, completedDays: {}, history: [] };
+                    if (prevProg.currentWeek >= activeRoutine.targetWeeks) {
+                      if (
+                        window.confirm(
+                          `🏆 ¡Felicitaciones! Has alcanzado el final de tu ciclo de ${activeRoutine.targetWeeks} ${
+                            activeRoutine.targetWeeks === 1 ? 'semana' : 'semanas'
+                          } en "${activeRoutine.name}".\n\n¿Deseas reiniciar el ciclo desde la Semana 1 conservando todo tu historial de sesiones?`
+                        )
+                      ) {
+                        saveProgressState({
+                          ...routineProgress,
+                          [activeRoutine.id]: { ...prevProg, currentWeek: 1, completedDays: {} }
+                        });
+                        if (onNotification) {
+                          onNotification(`🔄 ¡Nuevo ciclo iniciado en la Semana 1 de ${activeRoutine.targetWeeks}!`);
+                        }
+                      }
+                      return;
+                    }
                     const nextW = Math.min(activeRoutine.targetWeeks, prevProg.currentWeek + 1);
                     saveProgressState({
                       ...routineProgress,
@@ -661,9 +679,9 @@ export default function CustomRoutineModule({
                 onChange={(e) => setEditingRoutine({ ...editingRoutine, targetWeeks: parseInt(e.target.value, 10) || 8 })}
                 className="w-full bg-[#15181D] rounded-xl py-2 px-3 text-xs font-bold text-white border border-[#282F38] focus:border-[#1FD08A] outline-none cursor-pointer"
               >
-                {[4, 6, 8, 10, 12, 16].map((w) => (
+                {[1, 2, 4, 6, 8, 10, 12, 16].map((w) => (
                   <option key={w} value={w}>
-                    {w} semanas
+                    {w === 1 ? '1 semana (o rutina de 1 día)' : `${w} semanas`}
                   </option>
                 ))}
               </select>

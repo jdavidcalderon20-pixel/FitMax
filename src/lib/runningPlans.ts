@@ -46,7 +46,63 @@ export interface RunningCoachGuidance {
 export const formatPaceDecimal = (paceDecimal: number): string => {
   const mins = Math.floor(paceDecimal);
   const secs = Math.round((paceDecimal - mins) * 60);
+  if (secs === 60) {
+    return `${mins + 1}:00 min/km`;
+  }
   return `${mins}:${secs.toString().padStart(2, '0')} min/km`;
+};
+
+export const formatMMSS = (paceDecimal: number): string => {
+  const clamped = Math.max(2.0, paceDecimal);
+  const mins = Math.floor(clamped);
+  const secs = Math.round((clamped - mins) * 60);
+  if (secs === 60) {
+    return `${mins + 1}:00`;
+  }
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+export interface PaceRangeBounds {
+  fastestDecimal: number; // ej. 5.00 (5:00/km)
+  slowestDecimal: number; // ej. 5.25 (5:15/km)
+  rangeLabel: string;     // ej. "5:00 - 5:15 min/km"
+}
+
+/**
+ * Extrae o construye un rango de ritmo objetivo (mínimo y máximo en min/km)
+ * a partir de una etiqueta como "4:36 min/km" o "5:20 - 5:35 min/km".
+ */
+export const parsePaceRangeBounds = (paceStr?: string, marginSeconds: number = 8): PaceRangeBounds | null => {
+  if (!paceStr) return null;
+  const matches = Array.from(paceStr.matchAll(/(\d+):(\d{2})/g));
+  if (matches.length === 0) return null;
+
+  if (matches.length >= 2) {
+    const p1 = parseInt(matches[0][1], 10) + parseInt(matches[0][2], 10) / 60;
+    const p2 = parseInt(matches[1][1], 10) + parseInt(matches[1][2], 10) / 60;
+    const fastestDecimal = Math.min(p1, p2);
+    const slowestDecimal = Math.max(p1, p2);
+    return {
+      fastestDecimal,
+      slowestDecimal,
+      rangeLabel: `${formatMMSS(fastestDecimal)} - ${formatMMSS(slowestDecimal)} min/km`
+    };
+  }
+
+  const center = parseInt(matches[0][1], 10) + parseInt(matches[0][2], 10) / 60;
+  const delta = marginSeconds / 60;
+  const fastestDecimal = Math.max(2.5, center - delta);
+  const slowestDecimal = center + delta;
+  return {
+    fastestDecimal,
+    slowestDecimal,
+    rangeLabel: `${formatMMSS(fastestDecimal)} - ${formatMMSS(slowestDecimal)} min/km`
+  };
+};
+
+export const formatPaceRangeLabel = (paceStr?: string, marginSeconds: number = 8): string => {
+  const bounds = parsePaceRangeBounds(paceStr, marginSeconds);
+  return bounds ? bounds.rangeLabel : (paceStr || 'Ritmo libre');
 };
 
 // Calcula el tiempo total de carrera estimado según distancia y ritmo objetivo
@@ -1307,9 +1363,18 @@ export const buildWorkoutBlocksFromSession = (session: PlannedRunningSession): R
       continue;
     }
 
-    // Extraer ritmo sugerido si aparece entre paréntesis: (4:06 min/km)
-    const paceMatch = line.match(/(\d+:\d+\s*min\/km)/i);
-    const extractedPace = paceMatch ? paceMatch[1] : session.targetPaceLabel;
+    // Extraer ritmo sugerido si aparece entre paréntesis: (4:06 min/km) o rango
+    const paceMatch = line.match(/(\d+:\d+(?:\s*-\s*\d+:\d+)?\s*min\/km)/i);
+    const rawPace = paceMatch ? paceMatch[1] : session.targetPaceLabel;
+    const extractedPace = formatPaceRangeLabel(rawPace, 8);
+
+    // Calcular un rango suave Z1-Z2 para bloques de calentamiento/vuelta a la calma cuando la sesión principal es intensa
+    const sessionBounds = parsePaceRangeBounds(session.targetPaceLabel, 10);
+    const warmupCooldownRange = sessionBounds
+      ? (session.type === 'series' || session.type === 'tempo'
+          ? `${formatMMSS(sessionBounds.slowestDecimal + 0.85)} - ${formatMMSS(sessionBounds.slowestDecimal + 1.15)} min/km`
+          : sessionBounds.rangeLabel)
+      : extractedPace;
 
     // 1. Caso Fartlek / Intervalos por tiempo en una misma línea:
     // Ej: "8 bloques de 1 minuto a ritmo vivo (4:06 min/km) por 1 minuto de trote muy suave."
@@ -1428,7 +1493,7 @@ export const buildWorkoutBlocksFromSession = (session: PlannedRunningSession): R
             : `Bloque Principal · ${kmVal} km`,
         targetType: 'distance',
         targetValue: kmVal,
-        targetPace: extractedPace,
+        targetPace: (isWarmup || isCooldown) && !paceMatch ? warmupCooldownRange : extractedPace,
         instructions: line
       });
       continue;
@@ -1444,6 +1509,7 @@ export const buildWorkoutBlocksFromSession = (session: PlannedRunningSession): R
         title: `Activación / Movilidad · ${mins} min`,
         targetType: 'time',
         targetValue: mins * 60,
+        targetPace: warmupCooldownRange,
         instructions: line
       });
     }
@@ -1457,7 +1523,7 @@ export const buildWorkoutBlocksFromSession = (session: PlannedRunningSession): R
       title: `${session.name} · ${session.distanceKm} km`,
       targetType: 'distance',
       targetValue: session.distanceKm,
-      targetPace: session.targetPaceLabel,
+      targetPace: formatPaceRangeLabel(session.targetPaceLabel, 10),
       instructions: session.focus
     });
   }
