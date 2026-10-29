@@ -33,7 +33,9 @@ import {
   Award,
   ChevronDown,
   ChevronUp,
-  AlertCircle
+  AlertCircle,
+  Download,
+  Edit3
 } from 'lucide-react';
 import { 
   Squad, 
@@ -67,6 +69,16 @@ import { useAuth } from '../lib/auth';
 import { playBeepSound } from '../lib/sound';
 import SoftWallModal, { SoftWallTrigger } from './SoftWallModal';
 import { buildSquadInviteMessage, buildStreakShareMessage, shareContent, generateWhatsAppLink } from '../lib/share';
+import {
+  CustomRoutine,
+  getCustomRoutines,
+  saveCustomRoutine,
+  CoachRoutineAssignment,
+  getCoachAssignedRoutines,
+  sendRoutineFromCoach,
+  acceptCoachRoutineAssignment,
+  dismissCoachRoutineAssignment,
+} from '../lib/customRoutines';
 
 interface SquadsModuleProps {
   nickname: string;
@@ -77,6 +89,52 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
   const { user } = useAuth();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [softWallTrigger, setSoftWallTrigger] = useState<SoftWallTrigger | null>(null);
+
+  // Modo de operación en "Mi Gente": Modo Atleta & Amigos vs Modo Entrenador (Coach)
+  const [operatingMode, setOperatingMode] = useState<'atleta' | 'entrenador'>('atleta');
+  const [showTutorial, setShowTutorial] = useState<boolean>(false);
+
+  // Edición de cualquier grupo (incluidos los predeterminados)
+  const [editingSquad, setEditingSquad] = useState<Squad | null>(null);
+  const [editSquadName, setEditSquadName] = useState<string>('');
+  const [editSquadMotto, setEditSquadMotto] = useState<string>('');
+  const [editSquadDiscipline, setEditSquadDiscipline] = useState<SquadDiscipline>('hybrid');
+
+  // Estado del Modo Entrenador y Bandeja de Rutinas Recibidas
+  const [coachAssignments, setCoachAssignments] = useState<CoachRoutineAssignment[]>(() => getCoachAssignedRoutines());
+  const [myCustomRoutines, setMyCustomRoutines] = useState<CustomRoutine[]>(() => getCustomRoutines(nickname));
+  const [coachTargetStudent, setCoachTargetStudent] = useState<string>('');
+  const [coachMessage, setCoachMessage] = useState<string>('Hola, te envío tu nuevo bloque de entrenamiento estructurado por semanas.');
+  const [coachSelectedRoutineId, setCoachSelectedRoutineId] = useState<string>('new');
+  const [coachRoutineName, setCoachRoutineName] = useState<string>('Plan Personalizado Hipertrofia & Fuerza');
+  const [coachRoutineWeeks, setCoachRoutineWeeks] = useState<number>(8);
+  const [coachRoutineDays, setCoachRoutineDays] = useState<
+    { id: number; name: string; exercises: { name: string; sets: number; reps: string }[] }[]
+  >([
+    {
+      id: 1,
+      name: 'Día 1: Torso Fuerza & Control',
+      exercises: [
+        { name: 'Press de banca con barra', sets: 4, reps: '6-8' },
+        { name: 'Remo Pendlay con barra (Dead-Stop desde el suelo)', sets: 4, reps: '6-8' },
+        { name: 'Press militar con mancuernas', sets: 3, reps: '8-10' },
+      ],
+    },
+    {
+      id: 2,
+      name: 'Día 2: Pierna & Cadena Posterior',
+      exercises: [
+        { name: 'Sentadilla trasera con barra (Back Squat)', sets: 4, reps: '6-8' },
+        { name: 'Hip Thrust con barra (o mancuerna)', sets: 4, reps: '8-10' },
+        { name: 'Peso muerto rumano con barra', sets: 3, reps: '8-10' },
+      ],
+    },
+  ]);
+
+  useEffect(() => {
+    setMyCustomRoutines(getCustomRoutines(nickname));
+    setCoachAssignments(getCoachAssignedRoutines());
+  }, [nickname, operatingMode]);
 
   // Lista de combos guardados localmente
   const [squads, setSquads] = useState<Squad[]>(() => {
@@ -643,20 +701,191 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     if (onNotification) onNotification(going ? '¡Confirmaste tu asistencia! 🏃' : 'Respuesta registrada.');
   };
 
-  // Copiar rutina compartida al plan semanal adaptada
+  // Guardar la rutina compartida del grupo directamente en las Rutinas Personalizadas del usuario
   const handleCopyRoutineToWeekly = () => {
     if (!currentSquad?.sharedRoutine) {
-      alert('Este combo no tiene una rutina compartida activa.');
+      alert('Este grupo aún no tiene una rutina compartida activa.');
       return;
     }
     const routine = currentSquad.sharedRoutine;
     playBeepSound();
-    if (window.confirm(`¿Deseas clonar la rutina "${routine.title}" y adaptarla a tu plan semanal?`)) {
-      if (onNotification) {
-        onNotification(`¡Rutina "${routine.title}" clonada y adaptada a tu nivel con éxito! 💪`);
-      }
+
+    const convertedDays = (routine.daysData || []).map((d, dIdx) => ({
+      id: dIdx + 1,
+      name: d.title || `Día ${dIdx + 1}`,
+      subtitle: `Compartida en ${currentSquad.name}`,
+      exercises: (d.exercises || []).map((ex, eIdx) => ({
+        id: `sq_ex_${Date.now()}_${dIdx}_${eIdx}`,
+        name: ex.name,
+        category: 'General',
+        defaultSets: ex.sets || 4,
+        defaultReps: String(ex.reps || '8-10').replace(/\s*reps?\b/gi, '').trim() || '8-10',
+        restSeconds: 90,
+      })),
+    }));
+
+    saveCustomRoutine(nickname, {
+      name: `${routine.title} (${currentSquad.name})`,
+      description: routine.description,
+      targetWeeks: 8,
+      days: convertedDays.length > 0 ? convertedDays : [
+        {
+          id: 1,
+          name: 'Día 1: Entrenamiento Grupal',
+          exercises: [
+            { id: 'ex_1', name: 'Sentadilla trasera con barra (Back Squat)', category: 'Piernas', defaultSets: 4, defaultReps: '8-10', restSeconds: 90 },
+          ],
+        },
+      ],
+    });
+
+    setMyCustomRoutines(getCustomRoutines(nickname));
+    if (onNotification) {
+      onNotification(`¡Rutina "${routine.title}" guardada en tus Rutinas Personalizadas! Ve a Entrenar → Rutina personalizada para iniciarla.`);
     }
   };
+
+  // Compartir una de mis Rutinas Personalizadas con el grupo actual
+  const handleShareMyCustomRoutineToGroup = (customR: CustomRoutine) => {
+    if (!currentSquad) return;
+    const payload: SharedRoutinePayload = {
+      title: customR.name,
+      discipline: currentSquad.discipline,
+      description: customR.description || `Rutina de ${customR.targetWeeks} semanas compartida por ${nickname}`,
+      authorNickname: nickname,
+      sharedAt: Date.now(),
+      type: 'weekly_4day',
+      daysData: customR.days.map((d, idx) => ({
+        dayId: idx + 1,
+        title: d.name,
+        exercises: d.exercises.map((e) => ({
+          name: e.name,
+          sets: e.defaultSets,
+          reps: `${String(e.defaultReps).replace(/\s*reps?\b/gi, '').trim()} reps`,
+        })),
+      })),
+    };
+
+    setSquads((prev) =>
+      prev.map((sq) => (sq.id === currentSquad.id ? { ...sq, sharedRoutine: payload } : sq))
+    );
+    playBeepSound();
+    if (onNotification) {
+      onNotification(`¡Compartiste tu rutina "${customR.name}" con el grupo "${currentSquad.name}"!`);
+    }
+  };
+
+  // Editar cualquier grupo (incluidos los predeterminados)
+  const handleOpenEditSquad = (sq: Squad) => {
+    setEditingSquad(sq);
+    setEditSquadName(sq.name);
+    setEditSquadMotto(sq.motto);
+    setEditSquadDiscipline(sq.discipline);
+  };
+
+  const handleSaveEditedSquad = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSquad || !editSquadName.trim()) return;
+    setSquads((prev) =>
+      prev.map((sq) =>
+        sq.id === editingSquad.id
+          ? {
+              ...sq,
+              name: editSquadName.trim(),
+              motto: editSquadMotto.trim() || sq.motto,
+              discipline: editSquadDiscipline,
+            }
+          : sq
+      )
+    );
+    setEditingSquad(null);
+    if (onNotification) onNotification('¡Grupo actualizado con éxito!');
+  };
+
+  // Eliminar cualquier grupo (incluidos los grupos por defecto)
+  const handleDeleteSquad = (sq: Squad) => {
+    if (!window.confirm(`¿Deseas eliminar el grupo "${sq.name}" de tu lista de Mi Gente?`)) return;
+    const remaining = squads.filter((s) => s.id !== sq.id);
+    setSquads(remaining);
+    if (activeSquadId === sq.id) {
+      setActiveSquadId(remaining[0]?.id || '');
+    }
+    if (onNotification) onNotification(`Grupo "${sq.name}" eliminado.`);
+  };
+
+  // Restaurar grupos de ejemplo si el usuario borró todos y quiere ver ejemplos
+  const handleRestoreDefaultSquads = () => {
+    setSquads(DEFAULT_COMMUNITY_SQUADS);
+    setActiveSquadId(DEFAULT_COMMUNITY_SQUADS[0].id);
+    if (onNotification) onNotification('Grupos de demostración restaurados.');
+  };
+
+  // Modo Entrenador: Enviar rutina personalizada a un alumno o grupo
+  const handleSendRoutineAsCoach = (e: React.FormEvent) => {
+    e.preventDefault();
+    const recipient = coachTargetStudent.trim() || currentSquad?.name || 'Atleta';
+    let routineToSend: CustomRoutine;
+
+    if (coachSelectedRoutineId !== 'new') {
+      const existing = myCustomRoutines.find((r) => r.id === coachSelectedRoutineId);
+      if (!existing) return;
+      routineToSend = existing;
+    } else {
+      routineToSend = {
+        id: `coach_r_${Date.now()}`,
+        name: coachRoutineName.trim() || 'Rutina Asignada por Entrenador',
+        description: coachMessage.trim(),
+        targetWeeks: coachRoutineWeeks,
+        createdAt: Date.now(),
+        days: coachRoutineDays.map((d, dIdx) => ({
+          id: dIdx + 1,
+          name: d.name,
+          subtitle: `Ciclo de ${coachRoutineWeeks} semanas`,
+          exercises: d.exercises.map((ex, eIdx) => ({
+            id: `c_ex_${Date.now()}_${dIdx}_${eIdx}`,
+            name: ex.name,
+            category: 'Fuerza / Híbrido',
+            defaultSets: ex.sets || 4,
+            defaultReps: String(ex.reps || '8-10').replace(/\s*reps?\b/gi, '').trim() || '8-10',
+            restSeconds: 90,
+          })),
+        })),
+      };
+    }
+
+    sendRoutineFromCoach({
+      coachNickname: nickname,
+      targetRecipient: recipient,
+      coachMessage: coachMessage.trim(),
+      routine: routineToSend,
+    });
+
+    setCoachAssignments(getCoachAssignedRoutines());
+    playBeepSound();
+    if (onNotification) {
+      onNotification(`¡Rutina "${routineToSend.name}" enviada a ${recipient}! Ya aparece en la bandeja para agregarla a Rutinas Personalizadas.`);
+    }
+  };
+
+  const handleAcceptCoachRoutine = (assignmentId: string) => {
+    const saved = acceptCoachRoutineAssignment(nickname, assignmentId);
+    setCoachAssignments(getCoachAssignedRoutines());
+    setMyCustomRoutines(getCustomRoutines(nickname));
+    playBeepSound();
+    if (saved && onNotification) {
+      onNotification(`¡Rutina "${saved.name}" agregada! Ya está disponible en Entrenar → Rutina personalizada.`);
+    }
+  };
+
+  const handleDismissCoachRoutine = (assignmentId: string) => {
+    dismissCoachRoutineAssignment(nickname, assignmentId);
+    setCoachAssignments(getCoachAssignedRoutines());
+  };
+
+  // Rutinas pendientes en bandeja para este atleta
+  const pendingCoachRoutines = coachAssignments.filter(
+    (a) => !(a.acceptedBy || []).includes(nickname)
+  );
 
   // Unirse a un combo con código
   const handleJoinSquadByCode = async (e: React.FormEvent) => {
@@ -683,13 +912,13 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
       setShowJoinModal(false);
       setJoinCodeInput('');
       playBeepSound();
-      if (onNotification) onNotification(`¡Te has unido exitosamente al combo "${found.name}"! 🔥`);
+      if (onNotification) onNotification(`¡Te has unido exitosamente al grupo "${found.name}"! 🔥`);
     } else {
-      setJoinError('No se encontró ningún combo con ese código. Verifica las letras y números.');
+      setJoinError('No se encontró ningún grupo con ese código. Verifica las letras y números.');
     }
   };
 
-  // Crear nuevo combo
+  // Crear nuevo grupo
   const handleCreateNewSquad = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanName = newSquadName.trim();
@@ -727,7 +956,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     setNewSquadName('');
     setNewSquadMotto('');
     playBeepSound();
-    if (onNotification) onNotification(`¡Combo "${cleanName}" creado! Código de invitación: #${code}`);
+    if (onNotification) onNotification(`¡Grupo "${cleanName}" creado! Código de invitación: #${code}`);
   };
 
   // URL para invitar
@@ -736,193 +965,572 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
     return `${origin}/?squad=${currentSquad?.code || 'FITMAX'}`;
   }, [currentSquad]);
 
-  // Si no hay ningún combo configurado (Estado vacío total)
-  if (!currentSquad) {
-    return (
-      <div className="flex flex-col items-center justify-center py-12 px-4 max-w-lg mx-auto text-center space-y-6 animate-fadeIn">
-        <div className="w-16 h-16 rounded-3xl bg-[#1FD08A]/15 border border-[#1FD08A]/30 flex items-center justify-center text-[#1FD08A]">
-          <Users className="w-8 h-8" />
-        </div>
-
-        <div className="space-y-2">
-          <h2 className="text-xl sm:text-2xl font-black text-[#F4F2ED]">
-            Crea tu combo y entrena con tus amigos
-          </h2>
-          <p className="text-xs sm:text-sm text-[#A8B0BB] leading-relaxed">
-            Un combo es tu grupo privado de entrenamiento. Compitan en constancia, compartan rutinas y hagan check-in diario.
-          </p>
-        </div>
-
-        {/* 3 Pasos */}
-        <div className="w-full bg-[#20252C] border border-[#282F38] rounded-3xl p-5 text-left space-y-3.5">
-          <div className="flex items-start gap-3">
-            <span className="w-6 h-6 rounded-full bg-[#1FD08A] text-[#15181D] font-black text-xs flex items-center justify-center shrink-0">1</span>
-            <div>
-              <p className="text-xs font-bold text-[#F4F2ED]">Crea tu combo</p>
-              <p className="text-[11px] text-[#A8B0BB]">Elige un nombre y la disciplina deportiva de tu equipo.</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <span className="w-6 h-6 rounded-full bg-[#1FD08A] text-[#15181D] font-black text-xs flex items-center justify-center shrink-0">2</span>
-            <div>
-              <p className="text-xs font-bold text-[#F4F2ED]">Invita con WhatsApp o QR</p>
-              <p className="text-[11px] text-[#A8B0BB]">Tus amigos se unen con un solo toque y clonan tu plan.</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <span className="w-6 h-6 rounded-full bg-[#1FD08A] text-[#15181D] font-black text-xs flex items-center justify-center shrink-0">3</span>
-            <div>
-              <p className="text-xs font-bold text-[#F4F2ED]">Hagan su primer check-in</p>
-              <p className="text-[11px] text-[#A8B0BB]">Sumen rachas y feliciten las sesiones en el muro diario.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row gap-3 w-full">
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="flex-1 py-3.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-2xl text-xs shadow-md transition-all cursor-pointer"
-          >
-            Crear mi combo ahora
-          </button>
-          <button
-            onClick={() => setShowJoinModal(true)}
-            className="flex-1 py-3.5 bg-[#20252C] hover:bg-[#282F38] border border-[#282F38] text-[#F4F2ED] font-bold rounded-2xl text-xs transition-all cursor-pointer"
-          >
-            Unirme con código
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  const disciplineColor = getDisciplineColor(currentSquad.discipline);
+  const disciplineColor = currentSquad ? getDisciplineColor(currentSquad.discipline) : '#1FD08A';
 
   return (
     <div className="w-full space-y-5 animate-fadeIn pb-16">
-      {/* SELECTOR RÁPIDO DE COMBOS (SI TIENE MÁS DE 1) */}
-      {squads.length > 1 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {squads.map((sq) => {
-            const isSelected = sq.id === currentSquad.id;
-            return (
-              <button
-                key={sq.id}
-                onClick={() => setActiveSquadId(sq.id)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border ${
-                  isSelected
-                    ? 'bg-[#20252C] border-[#1FD08A] text-[#1FD08A] shadow-sm'
-                    : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED]'
-                }`}
-              >
-                {sq.name}
-              </button>
-            );
-          })}
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-2.5 py-1.5 rounded-xl text-xs text-[#A8B0BB] hover:text-[#F4F2ED] border border-dashed border-[#282F38] hover:border-[#1FD08A] transition-colors flex items-center gap-1 shrink-0"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Crear</span>
-          </button>
-        </div>
-      )}
-
-      {/* CABECERA PRINCIPAL DEL COMBO */}
-      <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 text-[#F4F2ED] space-y-4 shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* CABECERA SUPERIOR DE "MI GENTE": SELECTOR DE MODO (ATLETA vs ENTRENADOR) Y TUTORIAL */}
+      <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 text-[#F4F2ED] shadow-xl space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span 
-                className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider inline-block border"
-                style={{ 
-                  backgroundColor: `${disciplineColor}20`, 
-                  borderColor: `${disciplineColor}50`, 
-                  color: disciplineColor 
-                }}
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#1FD08A]/15 text-[#1FD08A] border border-[#1FD08A]/30">
+                Comunidad &amp; Coaching
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowTutorial(!showTutorial)}
+                className="text-[11px] font-bold text-[#5B8DEF] hover:underline flex items-center gap-1 cursor-pointer"
               >
-                {getDisciplineName(currentSquad.discipline)}
-              </span>
-
-              {isUserCaptain && (
-                <span className="bg-amber-400/20 text-amber-300 border border-amber-400/40 px-2 py-0.5 rounded-full text-[10px] font-bold flex items-center gap-1">
-                  👑 Capitán
-                </span>
-              )}
-
-              <span className="text-[#A8B0BB] text-xs font-semibold">
-                {currentMembers.length} {currentMembers.length === 1 ? 'miembro' : 'miembros'}
-              </span>
+                <span>{showTutorial ? 'Ocultar tutorial' : '📖 ¿Cómo funciona Mi Gente? (Ver guía)'}</span>
+              </button>
             </div>
-
-            <h2 className="text-xl sm:text-2xl font-black text-[#F4F2ED] tracking-tight">
-              {currentSquad.name}
+            <h2 className="text-xl sm:text-2xl font-black text-white mt-1">
+              Mi Gente — Grupos, Amigos y Modo Entrenador
             </h2>
-            <p className="text-xs text-[#A8B0BB] mt-0.5 max-w-lg">
-              {currentSquad.motto}
+            <p className="text-xs text-[#A8B0BB] mt-0.5">
+              Crea o edita tus propios grupos por deporte, comparte rutinas con amigos o envía planes personalizados como entrenador.
             </p>
           </div>
 
-          {/* BOTÓN PRINCIPAL: HACER CHECK-IN DE HOY */}
-          <div>
-            {userHasCheckedInToday ? (
-              <div className="bg-[#1FD08A]/15 border border-[#1FD08A]/40 text-[#1FD08A] px-4 py-2 rounded-2xl flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 shrink-0" />
-                <div className="text-left">
-                  <p className="text-xs font-black">Check-in de hoy listo</p>
-                  <p className="text-[10px] text-[#A8B0BB]">Racha: {userMemberInfo?.streakDays || 1} días seguidos 🔥</p>
+          {/* Selector de Modo Principal: Modo Atleta/Amigos vs Modo Entrenador */}
+          <div className="flex items-center gap-1.5 bg-[#15181D] p-1.5 rounded-2xl border border-[#282F38] self-start md:self-auto">
+            <button
+              type="button"
+              onClick={() => setOperatingMode('atleta')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                operatingMode === 'atleta'
+                  ? 'bg-[#1FD08A] text-[#15181D] shadow-md'
+                  : 'text-[#A8B0BB] hover:text-white'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Modo Atleta &amp; Amigos</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setOperatingMode('entrenador')}
+              className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
+                operatingMode === 'entrenador'
+                  ? 'bg-[#5B8DEF] text-white shadow-md'
+                  : 'text-[#A8B0BB] hover:text-white'
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Modo Entrenador (Coach)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* TUTORIAL PASO A PASO DESPLEGABLE */}
+        {showTutorial && (
+          <div className="bg-[#15181D] border border-[#5B8DEF]/40 rounded-2xl p-4 space-y-3 animate-fadeIn">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs sm:text-sm font-black text-[#5B8DEF] uppercase tracking-wider">
+                📖 Guía Rápida: ¿Cómo sacar el máximo provecho a "Mi Gente"?
+              </h4>
+              <button
+                type="button"
+                onClick={() => setShowTutorial(false)}
+                className="text-xs text-[#A8B0BB] hover:text-white cursor-pointer"
+              >
+                Cerrar ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="bg-[#20252C] p-3.5 rounded-xl border border-[#282F38] space-y-1.5">
+                <span className="inline-block px-2 py-0.5 rounded bg-[#1FD08A]/20 text-[#1FD08A] font-black text-[10px]">
+                  1. CREA, EDITA O BORRA GRUPOS
+                </span>
+                <p className="font-bold text-white">Tus grupos no son fijos</p>
+                <p className="text-[#A8B0BB] text-[11px] leading-relaxed">
+                  Puedes editar el nombre/lema o eliminar cualquiera de los grupos predeterminados con los botones <strong>Editar</strong> y <strong>Eliminar</strong>, y crear grupos distintos para Pesas, Running o Hyrox.
+                </p>
+              </div>
+              <div className="bg-[#20252C] p-3.5 rounded-xl border border-[#282F38] space-y-1.5">
+                <span className="inline-block px-2 py-0.5 rounded bg-[#5B8DEF]/20 text-[#5B8DEF] font-black text-[10px]">
+                  2. COMPARTE EL CÓDIGO O QR
+                </span>
+                <p className="font-bold text-white">Invita a tus amigos en segundos</p>
+                <p className="text-[#A8B0BB] text-[11px] leading-relaxed">
+                  Cada grupo genera un código único de 6 caracteres (ej. <code>#HYR202</code>). Envíalo por WhatsApp o muestra el QR para que tus amigos se unan con el botón <strong>Unirme con código</strong>.
+                </p>
+              </div>
+              <div className="bg-[#20252C] p-3.5 rounded-xl border border-[#282F38] space-y-1.5">
+                <span className="inline-block px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 font-black text-[10px]">
+                  3. MODO ENTRENADOR Y RUTINAS
+                </span>
+                <p className="font-bold text-white">Envía o recibe planes personalizados</p>
+                <p className="text-[#A8B0BB] text-[11px] leading-relaxed">
+                  En <strong>Modo Entrenador</strong> puedes crear una rutina para un alumno y enviársela. Al alumno le aparece una notificación arriba para guardarla con un clic en sus <strong>Rutinas Personalizadas</strong>.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* BANDEJA DE NOTIFICACIONES: RUTINAS ENVIADAS POR TU ENTRENADOR */}
+        {pendingCoachRoutines.length > 0 && (
+          <div className="space-y-2.5 pt-1">
+            {pendingCoachRoutines.map((assign) => (
+              <div
+                key={assign.id}
+                className="bg-gradient-to-r from-[#5B8DEF]/20 via-[#15181D] to-[#1FD08A]/15 border-2 border-[#1FD08A]/60 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg animate-fadeIn"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-full bg-[#1FD08A] text-[#15181D] font-black text-[10px] uppercase">
+                      🔔 Nueva Rutina de tu Entrenador
+                    </span>
+                    <span className="text-xs font-bold text-[#5B8DEF]">
+                      Enviada por Coach {assign.coachNickname} → Para: {assign.targetRecipient}
+                    </span>
+                  </div>
+                  <h4 className="text-sm sm:text-base font-black text-white">
+                    {assign.routine.name} ({assign.routine.targetWeeks} semanas · {assign.routine.days.length} días/sem)
+                  </h4>
+                  {assign.coachMessage && (
+                    <p className="text-xs text-zinc-300 italic">"{assign.coachMessage}"</p>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={() => handleDismissCoachRoutine(assign.id)}
+                    className="px-3 py-2 rounded-xl bg-[#20252C] hover:bg-[#282F38] text-[#A8B0BB] text-xs font-bold cursor-pointer"
+                  >
+                    Ocultar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAcceptCoachRoutine(assign.id)}
+                    className="px-4 py-2.5 rounded-xl bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs shadow-md cursor-pointer active:scale-95"
+                  >
+                    📥 Agregar a mis Rutinas Personalizadas
+                  </button>
                 </div>
               </div>
-            ) : (
-              <button
-                onClick={() => setShowCheckinModal(true)}
-                className="w-full sm:w-auto px-5 py-3 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
-              >
-                <Flame className="w-4 h-4 fill-[#15181D]" />
-                <span>Hacer check-in de hoy</span>
-              </button>
-            )}
+            ))}
           </div>
-        </div>
-
-        {/* ACCIONES DE INVITACIÓN (WHATSAPP + QR + CÓDIGO) */}
-        <div className="pt-3 border-t border-[#282F38] flex flex-wrap items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-bold text-[#A8B0BB]">Código de combo:</span>
-            <span className="font-mono text-xs font-black bg-[#15181D] px-2.5 py-1 rounded-lg border border-[#282F38] text-[#F4F2ED]">
-              #{currentSquad.code}
-            </span>
-            <button
-              onClick={() => handleCopyCode(currentSquad.code)}
-              className="p-1.5 hover:bg-[#15181D] rounded-lg text-[#A8B0BB] hover:text-[#F4F2ED] transition-colors cursor-pointer"
-              title="Copiar código"
-            >
-              {copiedCode ? <Check className="w-3.5 h-3.5 text-[#1FD08A]" /> : <Copy className="w-3.5 h-3.5" />}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <button
-              onClick={handleShareSquadWhatsApp}
-              className="px-3 py-1.5 bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#25D366] font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Invitar amigos por WhatsApp"
-            >
-              <Share2 className="w-3.5 h-3.5" />
-              <span>WhatsApp</span>
-            </button>
-
-            <button
-              onClick={() => setShowQrModal(true)}
-              className="px-3 py-1.5 bg-[#15181D] hover:bg-[#282F38] border border-[#282F38] text-[#F4F2ED] font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
-              title="Ver código QR de invitación"
-            >
-              <QrCode className="w-3.5 h-3.5 text-[#1FD08A]" />
-              <span>Código QR</span>
-            </button>
-          </div>
-        </div>
+        )}
       </div>
+
+      {/* PANEL DE MODO ENTRENADOR (COACH): CREAR Y ENVIAR RUTINAS PERSONALIZADAS A ALUMNOS */}
+      {operatingMode === 'entrenador' && (
+        <div className="bg-[#20252C] border-2 border-[#5B8DEF]/50 rounded-3xl p-5 text-[#F4F2ED] shadow-2xl space-y-5 animate-fadeIn">
+          <div className="flex items-center justify-between flex-wrap gap-2 border-b border-[#282F38] pb-3">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-wider text-[#5B8DEF] block">
+                Panel Profesional de Entrenador
+              </span>
+              <h3 className="text-base sm:text-lg font-black text-white">
+                Diseñar y Enviar Rutina Personalizada a un Alumno o Grupo
+              </h3>
+              <p className="text-xs text-[#A8B0BB] mt-0.5">
+                Cuando envíes la rutina, tu alumno recibirá una notificación con un botón para agregarla directamente a su sección de <strong>Rutinas Personalizadas</strong>.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSendRoutineAsCoach} className="space-y-4 text-xs">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">
+                  Destinatario (Alias del alumno o nombre del grupo):
+                </label>
+                <input
+                  type="text"
+                  value={coachTargetStudent}
+                  onChange={(e) => setCoachTargetStudent(e.target.value)}
+                  placeholder={`Ej: Carlos_Fit o ${currentSquad?.name || 'Grupo Hipertrofia'}`}
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3 py-2.5 text-white font-bold focus:outline-none focus:border-[#5B8DEF]"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">
+                  ¿Qué rutina deseas enviar?
+                </label>
+                <select
+                  value={coachSelectedRoutineId}
+                  onChange={(e) => setCoachSelectedRoutineId(e.target.value)}
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3 py-2.5 text-white font-bold focus:outline-none focus:border-[#5B8DEF]"
+                >
+                  <option value="new">✨ Diseñar nueva rutina aquí mismo</option>
+                  {myCustomRoutines.map((r) => (
+                    <option key={r.id} value={r.id}>
+                      📋 Mi rutina guardada: {r.name} ({r.targetWeeks} sem · {r.days.length} días)
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">
+                Mensaje o indicaciones del Entrenador para el alumno:
+              </label>
+              <input
+                type="text"
+                value={coachMessage}
+                onChange={(e) => setCoachMessage(e.target.value)}
+                placeholder="Ej: Prioriza controlar la fase excéntrica y mantén RIR 1-2 en los básicos..."
+                className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3 py-2 text-white focus:outline-none focus:border-[#5B8DEF]"
+              />
+            </div>
+
+            {coachSelectedRoutineId === 'new' && (
+              <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-4 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="sm:col-span-2">
+                    <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">
+                      Nombre de la rutina para el alumno
+                    </label>
+                    <input
+                      type="text"
+                      value={coachRoutineName}
+                      onChange={(e) => setCoachRoutineName(e.target.value)}
+                      className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">
+                      Duración (Semanas)
+                    </label>
+                    <select
+                      value={coachRoutineWeeks}
+                      onChange={(e) => setCoachRoutineWeeks(parseInt(e.target.value, 10) || 8)}
+                      className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                    >
+                      {[4, 6, 8, 12, 16].map((w) => (
+                        <option key={w} value={w}>
+                          {w} semanas
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Días de la rutina del entrenador */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase text-[#1FD08A]">
+                      Días estructurados ({coachRoutineDays.length})
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCoachRoutineDays((prev) => [
+                          ...prev,
+                          {
+                            id: prev.length + 1,
+                            name: `Día ${prev.length + 1}: Enfoque Específico`,
+                            exercises: [{ name: 'Dominadas o Jalón al pecho', sets: 4, reps: '8-10' }],
+                          },
+                        ])
+                      }
+                      className="text-xs font-bold text-[#1FD08A] hover:underline cursor-pointer"
+                    >
+                      + Añadir día
+                    </button>
+                  </div>
+
+                  {coachRoutineDays.map((cDay, dIdx) => (
+                    <div key={dIdx} className="bg-[#20252C] border border-[#282F38] rounded-xl p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <input
+                          type="text"
+                          value={cDay.name}
+                          onChange={(e) => {
+                            const next = [...coachRoutineDays];
+                            next[dIdx] = { ...next[dIdx], name: e.target.value };
+                            setCoachRoutineDays(next);
+                          }}
+                          className="bg-[#15181D] border border-[#282F38] rounded-lg px-2.5 py-1 text-white font-black text-xs flex-1"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = [...coachRoutineDays];
+                            next[dIdx] = {
+                              ...next[dIdx],
+                              exercises: [...next[dIdx].exercises, { name: 'Nuevo ejercicio', sets: 3, reps: '10-12' }],
+                            };
+                            setCoachRoutineDays(next);
+                          }}
+                          className="text-[11px] font-bold text-[#5B8DEF] hover:underline shrink-0 cursor-pointer"
+                        >
+                          + Ejercicio
+                        </button>
+                        {coachRoutineDays.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setCoachRoutineDays((prev) => prev.filter((_, i) => i !== dIdx))}
+                            className="text-zinc-500 hover:text-rose-400 p-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="space-y-1.5">
+                        {cDay.exercises.map((ex, eIdx) => (
+                          <div key={eIdx} className="flex items-center gap-2 flex-wrap sm:flex-nowrap bg-[#15181D] p-2 rounded-lg border border-[#282F38]">
+                            <input
+                              type="text"
+                              value={ex.name}
+                              onChange={(e) => {
+                                const next = [...coachRoutineDays];
+                                const exList = [...next[dIdx].exercises];
+                                exList[eIdx] = { ...exList[eIdx], name: e.target.value };
+                                next[dIdx] = { ...next[dIdx], exercises: exList };
+                                setCoachRoutineDays(next);
+                              }}
+                              className="flex-1 bg-transparent text-white font-bold text-xs outline-none"
+                            />
+                            <div className="flex items-center gap-1 bg-[#20252C] px-2 py-1 rounded border border-[#282F38]">
+                              <span className="text-[10px] text-[#A8B0BB]">Series:</span>
+                              <input
+                                type="number"
+                                min="1"
+                                max="10"
+                                value={ex.sets}
+                                onChange={(e) => {
+                                  const next = [...coachRoutineDays];
+                                  const exList = [...next[dIdx].exercises];
+                                  exList[eIdx] = { ...exList[eIdx], sets: parseInt(e.target.value, 10) || 3 };
+                                  next[dIdx] = { ...next[dIdx], exercises: exList };
+                                  setCoachRoutineDays(next);
+                                }}
+                                className="w-8 bg-transparent text-center font-bold text-white text-xs outline-none"
+                              />
+                            </div>
+                            <div className="flex items-center gap-1 bg-[#20252C] px-2 py-1 rounded border border-[#282F38]">
+                              <span className="text-[10px] text-[#A8B0BB]">Reps:</span>
+                              <input
+                                type="text"
+                                value={ex.reps}
+                                onChange={(e) => {
+                                  const clean = e.target.value.replace(/reps?/gi, '').replace(/[^0-9a\-\s/]/gi, '');
+                                  const next = [...coachRoutineDays];
+                                  const exList = [...next[dIdx].exercises];
+                                  exList[eIdx] = { ...exList[eIdx], reps: clean };
+                                  next[dIdx] = { ...next[dIdx], exercises: exList };
+                                  setCoachRoutineDays(next);
+                                }}
+                                className="w-12 bg-transparent text-center font-bold text-white text-xs outline-none"
+                              />
+                              <span className="text-[10px] text-[#A8B0BB] select-none">reps</span>
+                            </div>
+                            {cDay.exercises.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const next = [...coachRoutineDays];
+                                  next[dIdx] = {
+                                    ...next[dIdx],
+                                    exercises: next[dIdx].exercises.filter((_, i) => i !== eIdx),
+                                  };
+                                  setCoachRoutineDays(next);
+                                }}
+                                className="text-zinc-500 hover:text-rose-400 p-1 cursor-pointer"
+                              >
+                                <X className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="w-full py-3.5 bg-[#5B8DEF] hover:bg-blue-500 text-white font-black rounded-2xl text-xs sm:text-sm shadow-lg transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Send className="w-4 h-4" />
+              <span>Enviar Rutina al Alumno / Grupo</span>
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* SI EL USUARIO ELIMINÓ TODOS LOS GRUPOS: PANTALLA PARA CREAR O RESTAURAR */}
+      {!currentSquad ? (
+        <div className="flex flex-col items-center justify-center py-10 px-4 max-w-lg mx-auto text-center space-y-5 bg-[#20252C] border border-[#282F38] rounded-3xl">
+          <div className="w-14 h-14 rounded-3xl bg-[#1FD08A]/15 border border-[#1FD08A]/30 flex items-center justify-center text-[#1FD08A]">
+            <Users className="w-7 h-7" />
+          </div>
+          <div className="space-y-1.5">
+            <h3 className="text-lg font-black text-white">No tienes grupos activos en Mi Gente</h3>
+            <p className="text-xs text-[#A8B0BB]">
+              Crea tu propio grupo desde cero, únete con el código de un amigo o restaura los grupos de demostración.
+            </p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2.5 w-full">
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-4 py-3 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-2xl text-xs cursor-pointer"
+            >
+              + Crear nuevo grupo
+            </button>
+            <button
+              onClick={() => setShowJoinModal(true)}
+              className="px-4 py-3 bg-[#15181D] hover:bg-[#282F38] border border-[#282F38] text-white font-bold rounded-2xl text-xs cursor-pointer"
+            >
+              Unirme con código
+            </button>
+            <button
+              onClick={handleRestoreDefaultSquads}
+              className="px-4 py-3 bg-[#15181D] hover:bg-[#282F38] border border-[#282F38] text-[#A8B0BB] hover:text-white font-bold rounded-2xl text-xs cursor-pointer"
+            >
+              Restaurar grupos ejemplo
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* BARRA DE TUS GRUPOS (CREAR, UNIRSE, SELECCIONAR, EDITAR O ELIMINAR) */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {squads.map((sq) => {
+              const isSelected = sq.id === currentSquad.id;
+              return (
+                <button
+                  key={sq.id}
+                  onClick={() => setActiveSquadId(sq.id)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer border ${
+                    isSelected
+                      ? 'bg-[#20252C] border-[#1FD08A] text-[#1FD08A] shadow-sm'
+                      : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-[#F4F2ED]'
+                  }`}
+                >
+                  {sq.name}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="px-3 py-2 rounded-xl text-xs font-bold text-[#1FD08A] bg-[#1FD08A]/10 hover:bg-[#1FD08A]/20 border border-[#1FD08A]/30 transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Crear grupo</span>
+            </button>
+            <button
+              onClick={() => setShowJoinModal(true)}
+              className="px-3 py-2 rounded-xl text-xs font-bold text-[#A8B0BB] hover:text-white bg-[#15181D] border border-[#282F38] transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Unirme con código</span>
+            </button>
+          </div>
+
+          {/* CABECERA PRINCIPAL DEL GRUPO ACTIVO (CON BOTONES DE EDITAR Y ELIMINAR GRUPO) */}
+          <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 text-[#F4F2ED] space-y-4 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <span 
+                    className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider inline-block border"
+                    style={{ 
+                      backgroundColor: `${disciplineColor}20`, 
+                      borderColor: `${disciplineColor}50`, 
+                      color: disciplineColor 
+                    }}
+                  >
+                    {getDisciplineName(currentSquad.discipline)}
+                  </span>
+
+                  <span className="text-[#A8B0BB] text-xs font-semibold">
+                    {currentMembers.length} {currentMembers.length === 1 ? 'miembro' : 'miembros'}
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditSquad(currentSquad)}
+                    className="text-[11px] font-bold text-[#5B8DEF] hover:underline px-2 py-0.5 rounded bg-[#15181D] border border-[#282F38] cursor-pointer"
+                  >
+                    ✏️ Editar grupo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteSquad(currentSquad)}
+                    className="text-[11px] font-bold text-rose-400 hover:underline px-2 py-0.5 rounded bg-[#15181D] border border-[#282F38] cursor-pointer"
+                  >
+                    🗑️ Eliminar grupo
+                  </button>
+                </div>
+
+                <h2 className="text-xl sm:text-2xl font-black text-[#F4F2ED] tracking-tight">
+                  {currentSquad.name}
+                </h2>
+                <p className="text-xs text-[#A8B0BB] mt-0.5 max-w-lg">
+                  {currentSquad.motto}
+                </p>
+              </div>
+
+              {/* BOTÓN PRINCIPAL: HACER CHECK-IN DE HOY */}
+              <div>
+                {userHasCheckedInToday ? (
+                  <div className="bg-[#1FD08A]/15 border border-[#1FD08A]/40 text-[#1FD08A] px-4 py-2 rounded-2xl flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 shrink-0" />
+                    <div className="text-left">
+                      <p className="text-xs font-black">Check-in de hoy listo</p>
+                      <p className="text-[10px] text-[#A8B0BB]">Racha: {userMemberInfo?.streakDays || 1} días seguidos 🔥</p>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowCheckinModal(true)}
+                    className="w-full sm:w-auto px-5 py-3 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs rounded-2xl transition-all shadow-lg flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+                  >
+                    <Flame className="w-4 h-4 fill-[#15181D]" />
+                    <span>Registrar logro / Check-in</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* ACCIONES DE INVITACIÓN (WHATSAPP + QR + CÓDIGO) */}
+            <div className="pt-3 border-t border-[#282F38] flex flex-wrap items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-[#A8B0BB]">Código para unirse al grupo:</span>
+                <span className="font-mono text-xs font-black bg-[#15181D] px-2.5 py-1 rounded-lg border border-[#282F38] text-[#F4F2ED]">
+                  #{currentSquad.code}
+                </span>
+                <button
+                  onClick={() => handleCopyCode(currentSquad.code)}
+                  className="p-1.5 hover:bg-[#15181D] rounded-lg text-[#A8B0BB] hover:text-[#F4F2ED] transition-colors cursor-pointer"
+                  title="Copiar código"
+                >
+                  {copiedCode ? <Check className="w-3.5 h-3.5 text-[#1FD08A]" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={handleShareSquadWhatsApp}
+                  className="px-3 py-1.5 bg-[#25D366]/15 hover:bg-[#25D366]/25 border border-[#25D366]/40 text-[#25D366] font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                  title="Invitar amigos por WhatsApp"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>Invitar por WhatsApp</span>
+                </button>
+
+                <button
+                  onClick={() => setShowQrModal(true)}
+                  className="px-3 py-1.5 bg-[#15181D] hover:bg-[#282F38] border border-[#282F38] text-[#F4F2ED] font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                  title="Ver código QR de invitación"
+                >
+                  <QrCode className="w-3.5 h-3.5 text-[#1FD08A]" />
+                  <span>Código QR</span>
+                </button>
+              </div>
+            </div>
+          </div>
 
       {/* BLOQUE "HOY EN EL COMBO" (Section 10.2: ¿Quién entrenó hoy? + Racha grupal) */}
       <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 text-[#F4F2ED] space-y-3">
@@ -1256,10 +1864,10 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A] block">
-                Plan de entrenamiento oficial
+                Plan de entrenamiento compartido con el grupo
               </span>
               <h3 className="text-base sm:text-lg font-black text-[#F4F2ED]">
-                {currentSquad.sharedRoutine?.title || 'Rutina del combo'}
+                {currentSquad.sharedRoutine?.title || 'Rutina del grupo'}
               </h3>
               <p className="text-xs text-[#A8B0BB] mt-0.5">
                 {currentSquad.sharedRoutine?.description || 'Rutina diseñada y compartida para el equipo.'}
@@ -1270,10 +1878,32 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
               onClick={handleCopyRoutineToWeekly}
               className="px-4 py-2.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs rounded-xl flex items-center gap-2 shadow-md transition-all active:scale-95 cursor-pointer"
             >
-              <Copy className="w-4 h-4" />
-              <span>Copiar a mi plan semanal</span>
+              <Download className="w-4 h-4" />
+              <span>Guardar en mis Rutinas Personalizadas</span>
             </button>
           </div>
+
+          {/* Compartir una de mis rutinas personalizadas en el grupo */}
+          {myCustomRoutines.length > 0 && (
+            <div className="bg-[#15181D] border border-[#282F38] rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-black text-[#F4F2ED]">¿Quieres compartir tu propia rutina con este grupo?</p>
+                <p className="text-[11px] text-[#A8B0BB]">Selecciona una de tus Rutinas Personalizadas para publicarla en el grupo:</p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {myCustomRoutines.map((r) => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => handleShareMyCustomRoutineToGroup(r)}
+                    className="px-3 py-1.5 rounded-xl bg-[#20252C] hover:bg-[#1FD08A]/15 border border-[#282F38] hover:border-[#1FD08A]/40 text-[11px] font-bold text-[#F4F2ED] hover:text-[#1FD08A] transition-all cursor-pointer"
+                  >
+                    📤 Publicar "{r.name}"
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Días y ejercicios de la rutina */}
           <div className="space-y-3 pt-2">
@@ -1759,13 +2389,15 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
           </div>
         </div>
       )}
+      </>
+      )}
 
-      {/* MODAL CREAR COMBO */}
+      {/* MODAL CREAR GRUPO */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-[#20252C] text-[#F4F2ED] rounded-3xl max-w-md w-full p-6 border border-[#282F38] shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-[#282F38] mb-4">
-              <h3 className="font-extrabold text-base text-[#F4F2ED]">Crear nuevo combo</h3>
+              <h3 className="font-extrabold text-base text-[#F4F2ED]">Crear nuevo grupo en Mi Gente</h3>
               <button
                 onClick={() => setShowCreateModal(false)}
                 className="p-1.5 hover:bg-[#15181D] rounded-xl text-[#A8B0BB] hover:text-[#F4F2ED]"
@@ -1776,11 +2408,11 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
 
             <form onSubmit={handleCreateNewSquad} className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Nombre del combo</label>
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Nombre del grupo</label>
                 <input
                   type="text"
                   required
-                  placeholder="Ej: Titanes del Cross, Corredores Z2..."
+                  placeholder="Ej: Titanes del Cross, Alumnos Coach Juan..."
                   value={newSquadName}
                   onChange={(e) => setNewSquadName(e.target.value)}
                   className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
@@ -1805,7 +2437,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
                     { id: 'hybrid', label: 'Híbrido' },
                     { id: 'strength', label: 'Musculación' },
                     { id: 'running', label: 'Running' },
-                    { id: 'hyrox_ocr', label: 'Hyrox / OCR' }
+                    { id: 'hyrox_ocr', label: 'Hyrox / Funcional' }
                   ].map((d) => (
                     <button
                       key={d.id}
@@ -1827,7 +2459,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
                 type="submit"
                 className="w-full py-3.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs transition-all shadow-md mt-2 cursor-pointer"
               >
-                Crear combo e invitar amigos
+                Crear grupo e invitar amigos
               </button>
             </form>
           </div>
@@ -1839,7 +2471,7 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
           <div className="bg-[#20252C] text-[#F4F2ED] rounded-3xl max-w-md w-full p-6 border border-[#282F38] shadow-2xl">
             <div className="flex items-center justify-between pb-3 border-b border-[#282F38] mb-4">
-              <h3 className="font-extrabold text-base text-[#F4F2ED]">Unirme a un combo existente</h3>
+              <h3 className="font-extrabold text-base text-[#F4F2ED]">Unirme a un grupo existente</h3>
               <button
                 onClick={() => setShowJoinModal(false)}
                 className="p-1.5 hover:bg-[#15181D] rounded-xl text-[#A8B0BB] hover:text-[#F4F2ED]"
@@ -1873,8 +2505,92 @@ export default function SquadsModule({ nickname, onNotification }: SquadsModuleP
                 type="submit"
                 className="w-full py-3.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs transition-all shadow-md mt-2 cursor-pointer"
               >
-                Unirme al combo
+                Unirme al grupo
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDITAR GRUPO */}
+      {editingSquad && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#20252C] text-[#F4F2ED] rounded-3xl max-w-md w-full p-6 border border-[#282F38] shadow-2xl">
+            <div className="flex items-center justify-between pb-3 border-b border-[#282F38] mb-4">
+              <div className="flex items-center gap-2">
+                <Edit3 className="w-5 h-5 text-[#1FD08A]" />
+                <h3 className="font-extrabold text-base text-[#F4F2ED]">Editar grupo</h3>
+              </div>
+              <button
+                onClick={() => setEditingSquad(null)}
+                className="p-1.5 hover:bg-[#15181D] rounded-xl text-[#A8B0BB] hover:text-[#F4F2ED] cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditedSquad} className="space-y-4">
+              <div>
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Nombre del grupo</label>
+                <input
+                  type="text"
+                  required
+                  value={editSquadName}
+                  onChange={(e) => setEditSquadName(e.target.value)}
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Lema o motivación</label>
+                <input
+                  type="text"
+                  value={editSquadMotto}
+                  onChange={(e) => setEditSquadMotto(e.target.value)}
+                  className="w-full bg-[#15181D] border border-[#282F38] rounded-xl px-3.5 py-2.5 text-xs text-[#F4F2ED] focus:outline-none focus:border-[#1FD08A]"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-[#F4F2ED] block mb-1">Disciplina principal</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'hybrid', label: 'Híbrido' },
+                    { id: 'strength', label: 'Musculación' },
+                    { id: 'running', label: 'Running' },
+                    { id: 'hyrox_ocr', label: 'Hyrox / Funcional' }
+                  ].map((d) => (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setEditSquadDiscipline(d.id as any)}
+                      className={`p-2.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
+                        editSquadDiscipline === d.id
+                          ? 'bg-[#1FD08A]/15 border-[#1FD08A] text-[#1FD08A]'
+                          : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB]'
+                      }`}
+                    >
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingSquad(null)}
+                  className="flex-1 py-3 bg-[#15181D] hover:bg-[#282F38] text-[#A8B0BB] font-bold rounded-xl text-xs border border-[#282F38] cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs transition-all shadow-md cursor-pointer"
+                >
+                  Guardar cambios
+                </button>
+              </div>
             </form>
           </div>
         </div>

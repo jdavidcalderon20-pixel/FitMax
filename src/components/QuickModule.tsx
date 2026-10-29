@@ -320,6 +320,17 @@ export default function QuickModule({ nickname, selectedLevel, onNotification }:
             onNotification(`¡Sesión rápida ${activeTab} completada!`);
           }
         }}
+        onUpdateExerciseSummary={(exerciseName, summary) => {
+          const key = `${selectedLevel}_${activeTab}_${exerciseName}`;
+          setExerciseLogs((prev) => ({
+            ...prev,
+            [key]: {
+              weight: summary.weight || prev[key]?.weight || '',
+              reps: summary.reps || prev[key]?.reps || '',
+              completed: summary.completed || prev[key]?.completed || false,
+            }
+          }));
+        }}
         onNotification={onNotification}
       />
     );
@@ -502,6 +513,45 @@ export default function QuickModule({ nickname, selectedLevel, onNotification }:
           const log = exerciseLogs[key] || { weight: '', reps: '', completed: false };
           const suggestion = getProgressionSuggestion(exerciseHistory[key], exercise.defaultReps);
 
+          const dayIdForQuick = activeTab === 'A' ? 101 : 102;
+          let realSetsCount: number | null = null;
+          let realRepsStr: string | null = null;
+          let realWeightStr: string | null = null;
+          let hasCompletedSetsInSession = false;
+
+          try {
+            const savedSetsRaw = localStorage.getItem(
+              `fit_sets_${nickname}_${selectedLevel}_d${dayIdForQuick}_${exercise.name}`
+            );
+            if (savedSetsRaw) {
+              const parsedSets = JSON.parse(savedSetsRaw);
+              if (Array.isArray(parsedSets) && parsedSets.length > 0) {
+                const completedList = parsedSets.filter((s: any) => s.completed);
+                hasCompletedSetsInSession = completedList.length > 0;
+                const targetList = completedList.length > 0 ? completedList : parsedSets;
+                realSetsCount = targetList.length;
+                const uniqueReps = Array.from(
+                  new Set(targetList.map((s: any) => String(s.reps || '').trim()).filter(Boolean))
+                );
+                realRepsStr =
+                  uniqueReps.length === 1
+                    ? uniqueReps[0]
+                    : targetList
+                        .map((s: any) => String(s.reps || '').trim())
+                        .filter(Boolean)
+                        .join('/');
+                realWeightStr = targetList[targetList.length - 1]?.weight || '';
+              }
+            }
+          } catch {}
+
+          const defaultCleanReps = formatCleanReps(exercise.defaultReps);
+          const wasModifiedOrLogged =
+            hasCompletedSetsInSession ||
+            log.completed ||
+            (realSetsCount !== null && realSetsCount !== exercise.defaultSets) ||
+            (realRepsStr !== null && `${realRepsStr} reps` !== defaultCleanReps && realRepsStr !== '6');
+
           return (
             <div
               key={index}
@@ -539,9 +589,21 @@ export default function QuickModule({ nickname, selectedLevel, onNotification }:
                     <span className="text-[10px] font-bold text-[#A8B0BB] bg-[#15181D] px-2 py-0.5 rounded-md uppercase tracking-wider">
                       {exercise.category}
                     </span>
-                    <span className="text-[10px] font-bold text-white bg-[#15181D] px-2 py-0.5 rounded-md font-mono">
-                      {exercise.defaultSets} × {formatCleanReps(exercise.defaultReps)}
+                    <span
+                      className="text-[10px] font-bold text-[#A8B0BB] bg-[#15181D] px-2 py-0.5 rounded-md font-mono border border-[#282F38]"
+                      title="Series y repeticiones recomendadas"
+                    >
+                      Sugerido: {exercise.defaultSets} × {defaultCleanReps}
                     </span>
+                    {wasModifiedOrLogged && realSetsCount && realRepsStr && (
+                      <span
+                        className="text-[10px] font-black text-[#1FD08A] bg-[#1FD08A]/15 border border-[#1FD08A]/40 px-2 py-0.5 rounded-md font-mono"
+                        title="Series y repeticiones reales registradas o ajustadas por ti"
+                      >
+                        {log.completed || hasCompletedSetsInSession ? '✓ Realizado:' : 'Tu ajuste:'} {realSetsCount} × {realRepsStr} reps
+                        {realWeightStr ? ` (${realWeightStr} kg)` : ''}
+                      </span>
+                    )}
                     <span className="text-[10px] font-bold text-purple-300 bg-purple-950/60 border border-purple-800/40 px-2 py-0.5 rounded-md">
                       RIR {getTargetRIR(exercise.category)}
                     </span>

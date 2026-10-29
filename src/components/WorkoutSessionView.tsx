@@ -50,6 +50,10 @@ interface WorkoutSessionViewProps {
   onClose: () => void;
   onFinishWorkout: () => void;
   onSwapExercise?: (index: number, newName: string) => void;
+  onUpdateExerciseSummary?: (
+    exerciseName: string,
+    summary: { sets: number; reps: string; weight: string; completed: boolean }
+  ) => void;
   onNotification?: (msg: string) => void;
 }
 
@@ -63,6 +67,7 @@ export default function WorkoutSessionView({
   onClose,
   onFinishWorkout,
   onSwapExercise,
+  onUpdateExerciseSummary,
   onNotification
 }: WorkoutSessionViewProps) {
   const [currentExIndex, setCurrentExIndex] = useState<number>(initialExerciseIndex);
@@ -121,13 +126,27 @@ export default function WorkoutSessionView({
   const currentExercise = exercises[currentExIndex] || exercises[0];
   const currentSets = exerciseSets[currentExercise?.name] || [];
 
-  // Guardar en localStorage cada vez que cambien las series
+  // Guardar en localStorage cada vez que cambien las series y sincronizar con la vista general
   useEffect(() => {
-    if (!currentExercise) return;
+    if (!currentExercise || !currentSets || currentSets.length === 0) return;
     const storageKey = `fit_sets_${nickname}_${selectedLevel}_d${dayId}_${currentExercise.name}`;
     try {
       localStorage.setItem(storageKey, JSON.stringify(currentSets));
     } catch (e) {}
+
+    if (onUpdateExerciseSummary) {
+      const completedSets = currentSets.filter((s) => s.completed);
+      const refSets = completedSets.length > 0 ? completedSets : currentSets;
+      const uniqueReps = Array.from(new Set(refSets.map((s) => s.reps.trim()).filter(Boolean)));
+      const repsLabel = uniqueReps.length === 1 ? uniqueReps[0] : refSets.map((s) => s.reps.trim()).filter(Boolean).join('/');
+      const lastWeight = refSets[refSets.length - 1]?.weight || currentSets[0]?.weight || '';
+      onUpdateExerciseSummary(currentExercise.name, {
+        sets: completedSets.length > 0 ? completedSets.length : currentSets.length,
+        reps: repsLabel || '8',
+        weight: lastWeight,
+        completed: completedSets.length > 0
+      });
+    }
   }, [currentSets, currentExercise, nickname, selectedLevel, dayId]);
 
   // Manejo del cronómetro de descanso

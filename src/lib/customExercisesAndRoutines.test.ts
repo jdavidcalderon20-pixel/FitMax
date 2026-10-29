@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { getCustomExercises, saveCustomExercise, deleteCustomExercise } from './customExercises';
-import { getCustomRoutines, saveCustomRoutine, deleteCustomRoutine } from './customRoutines';
+import {
+  getCustomRoutines,
+  saveCustomRoutine,
+  deleteCustomRoutine,
+  sendRoutineFromCoach,
+  getCoachAssignedRoutines,
+  acceptCoachRoutineAssignment,
+} from './customRoutines';
 
 // Mock localStorage
 const localStorageMock = (() => {
@@ -120,5 +127,50 @@ describe('customRoutines - Gestión de rutinas estructuradas personalizadas', ()
     const after = getCustomRoutines('atleta1');
     expect(after.length).toBe(1);
     expect(after[0].id).toBe(r2.id);
+  });
+
+  it('envía una rutina en Modo Coach y permite al alumno agregarla a sus Rutinas Personalizadas', () => {
+    const coachRoutine = saveCustomRoutine('CoachJuan', {
+      name: 'Mesociclo Hipertrofia 8 Semanas',
+      description: 'Plan de fuerza progresiva',
+      targetWeeks: 8,
+      days: [
+        {
+          id: 1,
+          name: 'Día 1: Empuje',
+          subtitle: 'Pecho y Hombro',
+          exercises: [
+            {
+              id: 'ex-coach-1',
+              name: 'Press de banca con barra',
+              category: 'Pecho',
+              defaultSets: 4,
+              defaultReps: '6 a 8',
+              restSeconds: 120,
+            },
+          ],
+        },
+      ],
+    });
+
+    const assignment = sendRoutineFromCoach({
+      coachNickname: 'CoachJuan',
+      targetRecipient: 'AtletaPedro',
+      routine: coachRoutine,
+      coachMessage: 'Respeta RIR 2 en las primeras 4 semanas.',
+    });
+
+    const inbox = getCoachAssignedRoutines();
+    expect(inbox.length).toBe(1);
+    expect(inbox[0].id).toBe(assignment.id);
+    expect(inbox[0].coachNickname).toBe('CoachJuan');
+
+    const imported = acceptCoachRoutineAssignment('AtletaPedro', assignment.id);
+    expect(imported).not.toBeNull();
+    expect(imported?.targetWeeks).toBe(8);
+
+    const athleteRoutines = getCustomRoutines('AtletaPedro');
+    expect(athleteRoutines.length).toBe(1);
+    expect(athleteRoutines[0].name).toContain('Mesociclo Hipertrofia 8 Semanas');
   });
 });

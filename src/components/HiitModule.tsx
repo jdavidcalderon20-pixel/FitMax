@@ -145,6 +145,74 @@ export default function HiitModule() {
     }
   };
 
+  // Circuitos HIIT / Funcionales personalizados creados por el usuario
+  const [userHiitPresets, setUserHiitPresets] = useState<
+    Record<
+      string,
+      {
+        name: string;
+        description: string;
+        work: number;
+        rest: number;
+        rounds: number;
+        evidence: 'A' | 'B' | 'C';
+        exercises: string[];
+        isCustom?: boolean;
+      }
+    >
+  >(() => {
+    try {
+      const saved = localStorage.getItem('fitmax_custom_hiit_presets_v1');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [showCreateCircuitModal, setShowCreateCircuitModal] = useState(false);
+  const [newCircuitName, setNewCircuitName] = useState('Mi Circuito HIIT Personalizado');
+  const [newCircuitWork, setNewCircuitWork] = useState('45');
+  const [newCircuitRest, setNewCircuitRest] = useState('15');
+  const [newCircuitRounds, setNewCircuitRounds] = useState('8');
+  const [newCircuitExercises, setNewCircuitExercises] = useState<string[]>([
+    'Burpees completos',
+    'Sentadillas con salto',
+    'Escaladores (Mountain climbers)',
+    'Balanceos con pesa rusa (Kettlebell swings)'
+  ]);
+
+  const allHiitPresets = { ...hiitPresets, ...userHiitPresets };
+
+  const handleSaveCustomCircuit = () => {
+    const validEx = newCircuitExercises.map((s) => s.trim()).filter(Boolean);
+    if (validEx.length === 0) return;
+    const id = `custom_hiit_${Date.now()}`;
+    const workSec = Math.max(5, parseInt(newCircuitWork, 10) || 40);
+    const restSec = Math.max(5, parseInt(newCircuitRest, 10) || 20);
+    const roundsCnt = Math.max(1, parseInt(newCircuitRounds, 10) || 8);
+
+    const next = {
+      ...userHiitPresets,
+      [id]: {
+        name: newCircuitName.trim() || 'Circuito Personalizado',
+        description: `Protocolo personalizado: ${workSec}s de trabajo × ${restSec}s de descanso (${roundsCnt} rondas).`,
+        work: workSec,
+        rest: restSec,
+        rounds: roundsCnt,
+        evidence: 'A' as const,
+        exercises: validEx,
+        isCustom: true,
+      },
+    };
+    setUserHiitPresets(next);
+    try {
+      localStorage.setItem('fitmax_custom_hiit_presets_v1', JSON.stringify(next));
+    } catch {}
+    setCardioMode('hiit');
+    setHiitPreset(id);
+    setShowCreateCircuitModal(false);
+  };
+
   const activeFunctionalRoutine = FUNCTIONAL_ROUTINES.find((r) => r.id === selectedFunctionalId) || FUNCTIONAL_ROUTINES[0];
 
   const handleShuffleCircuit = () => {
@@ -156,12 +224,13 @@ export default function HiitModule() {
     }));
   };
 
-  const activeExercises = customCircuit[hiitPreset] || hiitPresets[hiitPreset].exercises;
+  const activeHiitPresetObj = allHiitPresets[hiitPreset] || hiitPresets.diez_uno;
+  const activeExercises = customCircuit[hiitPreset] || activeHiitPresetObj.exercises;
 
   // Sincronización del temporizador según el modo activo
   useEffect(() => {
     if (cardioMode === 'hiit') {
-      const config = hiitPresets[hiitPreset];
+      const config = allHiitPresets[hiitPreset] || hiitPresets.diez_uno;
       setHiitTotalRounds(config.rounds);
       setHiitWorkDuration(config.work);
       setHiitRestDuration(config.rest);
@@ -246,7 +315,6 @@ export default function HiitModule() {
   }, [hiitRunning]);
 
   // Estación actual activa en modo funcional o HIIT
-  const activeHiitPresetObj = hiitPresets[hiitPreset];
   const hiitStationsList = activeHiitPresetObj.exercises;
   const currentHiitStationIndex = (hiitRound - 1) % hiitStationsList.length;
   const nextHiitStationIndex = hiitRound % hiitStationsList.length;
@@ -273,13 +341,23 @@ export default function HiitModule() {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsMuted(!isMuted)}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#282F38] text-xs font-bold text-[#A8B0BB] hover:text-[#F4F2ED] bg-[#20252C] transition-all cursor-pointer"
-        >
-          {isMuted ? <VolumeX className="w-4 h-4 text-zinc-500" /> : <Volume2 className="w-4 h-4 text-[#1FD08A]" />}
-          <span>{isMuted ? 'Silenciado' : 'Sonido activo'}</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowCreateCircuitModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] text-xs font-black shadow-md transition-all cursor-pointer active:scale-95"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>+ Crear Circuito Personalizado</span>
+          </button>
+
+          <button
+            onClick={() => setIsMuted(!isMuted)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#282F38] text-xs font-bold text-[#A8B0BB] hover:text-[#F4F2ED] bg-[#20252C] transition-all cursor-pointer"
+          >
+            {isMuted ? <VolumeX className="w-4 h-4 text-zinc-500" /> : <Volume2 className="w-4 h-4 text-[#1FD08A]" />}
+            <span>{isMuted ? 'Silenciado' : 'Sonido activo'}</span>
+          </button>
+        </div>
       </div>
 
       {/* SELECTOR DE MODALIDAD: CARDIO HIIT vs ENTRENAMIENTO FUNCIONAL */}
@@ -349,10 +427,10 @@ export default function HiitModule() {
             </div>
           </div>
 
-          {/* SELECTOR DE PROTOCOLOS HIIT */}
+          {/* SELECTOR DE PROTOCOLOS HIIT + PERSONALIZADOS */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {(Object.keys(hiitPresets) as Array<keyof typeof hiitPresets>).map((presetId) => {
-              const preset = hiitPresets[presetId];
+            {Object.keys(allHiitPresets).map((presetId) => {
+              const preset = allHiitPresets[presetId];
               const isSelected = hiitPreset === presetId;
               return (
                 <button
@@ -366,7 +444,13 @@ export default function HiitModule() {
                 >
                   <div>
                     <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
-                      <EvidenceBadge evidence={preset.evidence} size="sm" />
+                      {(preset as any).isCustom ? (
+                        <span className="text-[9px] font-black uppercase bg-[#1FD08A]/20 text-[#1FD08A] px-2 py-0.5 rounded-full">
+                          ✨ Personalizado
+                        </span>
+                      ) : (
+                        <EvidenceBadge evidence={preset.evidence} size="sm" />
+                      )}
                       <span className="text-[10px] font-mono text-[#A8B0BB] font-bold">
                         {preset.rounds} rondas
                       </span>
@@ -774,6 +858,139 @@ export default function HiitModule() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* MODAL CREADOR DE CIRCUITO HIIT / FUNCIONAL PERSONALIZADO */}
+      {showCreateCircuitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#15181D] border border-[#282F38] rounded-3xl w-full max-w-md p-5 text-white shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-[#282F38] pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A] block">
+                  Cronómetro de Intervalos a Medida
+                </span>
+                <h3 className="text-base font-black text-white">Crear Circuito Personalizado</h3>
+              </div>
+              <button
+                onClick={() => setShowCreateCircuitModal(false)}
+                className="px-2 py-1 rounded-xl text-zinc-400 hover:text-white hover:bg-[#20252C] text-xs font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs overflow-y-auto flex-1 pr-1">
+              <div>
+                <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Nombre del Circuito</label>
+                <input
+                  type="text"
+                  value={newCircuitName}
+                  onChange={(e) => setNewCircuitName(e.target.value)}
+                  placeholder="Ej: Mi Tabata Explosivo"
+                  className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Trabajo (seg)</label>
+                  <input
+                    type="number"
+                    min="5"
+                    step="5"
+                    value={newCircuitWork}
+                    onChange={(e) => setNewCircuitWork(e.target.value)}
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Descanso (seg)</label>
+                  <input
+                    type="number"
+                    min="5"
+                    step="5"
+                    value={newCircuitRest}
+                    onChange={(e) => setNewCircuitRest(e.target.value)}
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Rondas</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="40"
+                    value={newCircuitRounds}
+                    onChange={(e) => setNewCircuitRounds(e.target.value)}
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-[#A8B0BB]">
+                    Estaciones / Ejercicios ({newCircuitExercises.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setNewCircuitExercises((prev) => [...prev, 'Burpees completos'])}
+                    className="text-[11px] font-bold text-[#1FD08A] hover:underline cursor-pointer"
+                  >
+                    + Añadir estación
+                  </button>
+                </div>
+
+                {newCircuitExercises.map((exName, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-[#FB923C] bg-[#FB923C]/15 px-2 py-1 rounded-lg">
+                      #{idx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={exName}
+                      onChange={(e) => {
+                        const next = [...newCircuitExercises];
+                        next[idx] = e.target.value;
+                        setNewCircuitExercises(next);
+                      }}
+                      placeholder="Escribe o elige un ejercicio..."
+                      className="flex-1 bg-[#20252C] border border-[#282F38] rounded-xl px-2.5 py-1.5 text-white font-bold text-xs focus:outline-none focus:border-[#1FD08A]"
+                    />
+                    {newCircuitExercises.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setNewCircuitExercises((prev) => prev.filter((_, i) => i !== idx))
+                        }
+                        className="text-zinc-500 hover:text-rose-400 px-1.5 py-1 text-xs font-bold cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-[#282F38]">
+              <button
+                type="button"
+                onClick={() => setShowCreateCircuitModal(false)}
+                className="flex-1 py-2.5 bg-[#20252C] hover:bg-[#282F38] text-[#A8B0BB] font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCustomCircuit}
+                className="flex-1 py-2.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs cursor-pointer"
+              >
+                Guardar Circuito
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

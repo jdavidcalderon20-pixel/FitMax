@@ -140,6 +140,9 @@ export default function App() {
     setNickname(clean);
     try {
       localStorage.setItem('fit_gen_nickname', clean);
+      if (clean.toLowerCase() === 'invitado' && !user) {
+        localStorage.removeItem('fitmax_user_role');
+      }
       if (!profiles.includes(clean)) {
         const updated = [...profiles, clean];
         setProfiles(updated);
@@ -213,18 +216,28 @@ export default function App() {
     showNotification(`Nivel actualizado a: ${lvlName}`);
   };
 
+  const isGuestProfile = !user && nickname.trim().toLowerCase() === 'invitado';
   const isOwnerEmail = Boolean(user?.email && user.email.toLowerCase() === 'jdavidcalderon20@gmail.com');
-  const isAdmin = isOwnerEmail || userSubscription?.role === 'admin' || (typeof localStorage !== 'undefined' && localStorage.getItem('fitmax_user_role') === 'admin');
+  const isAdmin = !isGuestProfile && (
+    isOwnerEmail ||
+    (Boolean(user) && userSubscription?.role === 'admin') ||
+    (typeof localStorage !== 'undefined' && localStorage.getItem('fitmax_user_role') === 'admin')
+  );
 
   // Asegurar permisos inmediatos de Propietario si la sesión activa es el correo del dueño
+  // y limpiar rol admin residual si está en modo Invitado sin sesión autenticada
   useEffect(() => {
     if (isOwnerEmail) {
       try {
         localStorage.setItem('fitmax_user_role', 'admin');
         localStorage.setItem('fitmax_subscription_tier', 'beta_lifetime');
       } catch {}
+    } else if (isGuestProfile) {
+      try {
+        localStorage.removeItem('fitmax_user_role');
+      } catch {}
     }
-  }, [isOwnerEmail]);
+  }, [isOwnerEmail, isGuestProfile]);
 
   // Redirigir fuera de la consola Admin si el usuario no tiene permisos
   useEffect(() => {
@@ -246,6 +259,9 @@ export default function App() {
       <WelcomeScreen
         initialNickname={nickname}
         onEnterAsGuest={(enteredNick) => {
+          try {
+            localStorage.removeItem('fitmax_user_role');
+          } catch {}
           handleSwitchProfile(enteredNick);
           setHasEntered(true);
           try {
@@ -253,6 +269,9 @@ export default function App() {
           } catch {}
         }}
         onEnterAsAdmin={() => {
+          if (nickname.trim().toLowerCase() === 'invitado') {
+            handleSwitchProfile('Administrador');
+          }
           setHasEntered(true);
           try {
             localStorage.setItem('fitmax_has_entered_v1', 'true');
@@ -269,7 +288,7 @@ export default function App() {
   const navSections = [
     { id: 'today' as const, label: 'Hoy', icon: Home },
     { id: 'train' as const, label: 'Entrenar', icon: Dumbbell },
-    { id: 'squads' as const, label: 'Combo', icon: Users },
+    { id: 'squads' as const, label: 'Mi Gente', icon: Users },
     { id: 'library' as const, label: 'Biblioteca', icon: BookOpen },
     { id: 'profile' as const, label: 'Perfil', icon: User },
   ];

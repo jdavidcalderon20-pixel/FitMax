@@ -6,6 +6,16 @@ import { PeriodizationPhase } from './periodization';
 
 export type RaceDistance = '5K' | '10K' | '21K' | '42K';
 
+export interface RunningWorkoutBlock {
+  id: string;
+  phaseType: 'warmup' | 'work' | 'recovery' | 'cooldown';
+  title: string;
+  targetType: 'distance' | 'time';
+  targetValue: number; // km si es 'distance', segundos si es 'time'
+  targetPace?: string;
+  instructions: string;
+}
+
 export interface PlannedRunningSession {
   id: string;
   dayTitle: string;
@@ -17,6 +27,8 @@ export interface PlannedRunningSession {
   rpe: number;
   focus: string;
   structure: string[];
+  isCustom?: boolean;
+  customBlocks?: RunningWorkoutBlock[];
 }
 
 export interface RunningCoachGuidance {
@@ -1255,3 +1267,229 @@ export const getRunningCoachGuidance = (
     suggestedSchedule
   };
 };
+
+// Convierte una sesión planificada o personalizada en una secuencia de bloques interactivos paso a paso
+export const buildWorkoutBlocksFromSession = (session: PlannedRunningSession): RunningWorkoutBlock[] => {
+  if (session.customBlocks && session.customBlocks.length > 0) {
+    return session.customBlocks;
+  }
+
+  const blocks: RunningWorkoutBlock[] = [];
+  let blockIdx = 1;
+
+  // Buscar tiempos de recuperación sueltos en las líneas (ej. "75 segundos de recuperación...", "90 segundos de recuperación...", "2 minutos de recuperación...")
+  let standaloneRecoverySec = 0;
+  for (const line of session.structure) {
+    const lower = line.toLowerCase();
+    if (lower.includes('recuperación') || lower.includes('descanso')) {
+      const secMatch = line.match(/(\d+)\s*(?:segundos|s\b)/i);
+      const minMatch = line.match(/(\d+)\s*(?:minutos|min\b)/i);
+      if (secMatch && !lower.includes('repeticiones') && !lower.includes('series') && !lower.includes('bloques')) {
+        standaloneRecoverySec = parseInt(secMatch[1], 10);
+      } else if (minMatch && !lower.includes('repeticiones') && !lower.includes('series') && !lower.includes('bloques')) {
+        standaloneRecoverySec = parseInt(minMatch[1], 10) * 60;
+      }
+    }
+  }
+
+  for (let i = 0; i < session.structure.length; i++) {
+    const line = session.structure[i];
+    const lower = line.toLowerCase();
+
+    // Ignorar líneas que ya fueron absorbidas como descanso suelto entre series
+    if (
+      (lower.includes('recuperación') || lower.includes('descanso')) &&
+      !lower.includes('repeticiones') &&
+      !lower.includes('series') &&
+      !lower.includes('bloques') &&
+      !lower.includes('rectas')
+    ) {
+      continue;
+    }
+
+    // Extraer ritmo sugerido si aparece entre paréntesis: (4:06 min/km)
+    const paceMatch = line.match(/(\d+:\d+\s*min\/km)/i);
+    const extractedPace = paceMatch ? paceMatch[1] : session.targetPaceLabel;
+
+    // 1. Caso Fartlek / Intervalos por tiempo en una misma línea:
+    // Ej: "8 bloques de 1 minuto a ritmo vivo (4:06 min/km) por 1 minuto de trote muy suave."
+    // Ej: "6 repeticiones de 1 minuto a ritmo alegre (4:36 min/km) por 1 minuto de trote muy suave."
+    const timeIntervalMatch = line.match(/(\d+)\s*(?:repeticiones|bloques|series)\s*de\s*(\d+)\s*(?:minuto|minutos|min)\b.*?(?:por|con)\s*(\d+)\s*(minuto|minutos|min|segundos|s)\b/i);
+    if (timeIntervalMatch) {
+      const reps = parseInt(timeIntervalMatch[1], 10);
+      const workSec = parseInt(timeIntervalMatch[2], 10) * 60;
+      const restVal = parseInt(timeIntervalMatch[3], 10);
+      const restUnit = timeIntervalMatch[4].toLowerCase();
+      const restSec = restUnit.startsWith('min') ? restVal * 60 : restVal;
+
+      for (let r = 1; r <= reps; r++) {
+        blocks.push({
+          id: `b_${blockIdx++}`,
+          phaseType: 'work',
+          title: `Serie ${r} de ${reps} · ${timeIntervalMatch[2]} min rápido`,
+          targetType: 'time',
+          targetValue: workSec,
+          targetPace: extractedPace,
+          instructions: `Mantén ritmo vivo (${extractedPace}) durante este bloque.`
+        });
+        blocks.push({
+          id: `b_${blockIdx++}`,
+          phaseType: 'recovery',
+          title: `Recuperación ${r} de ${reps} · ${restSec}s suave`,
+          targetType: 'time',
+          targetValue: restSec,
+          instructions: 'Trote muy suave o caminata activa para bajar pulsaciones.'
+        });
+      }
+      continue;
+    }
+
+    // 2. Caso Series por distancia en metros (ej. "6 repeticiones de 400m", "4 repeticiones de 1000m", "4 rectas vivas de 200m... con 90s de descanso")
+    const distMetersMatch = line.match(/(\d+)\s*(?:repeticiones|series|bloques|rectas(?:\s+vivas)?|aceleraciones(?:\s+progresivas)?)\s*de\s*(\d+)\s*(?:m|metros)\b/i);
+    if (distMetersMatch) {
+      const reps = parseInt(distMetersMatch[1], 10);
+      const meters = parseInt(distMetersMatch[2], 10);
+      const distKm = Math.round((meters / 1000) * 1000) / 1000;
+
+      // Buscar si la misma línea especifica descanso (ej. "con 90s de descanso")
+      let inlineRestSec = standaloneRecoverySec || (meters <= 200 ? 60 : meters <= 500 ? 75 : 90);
+      const inlineSecMatch = line.match(/con\s*(\d+)\s*(?:s|segundos)\s*de\s*(?:descanso|recuperación)/i);
+      const inlineMinMatch = line.match(/con\s*(\d+)\s*(?:min|minutos)\s*de\s*(?:descanso|recuperación)/i);
+      if (inlineSecMatch) inlineRestSec = parseInt(inlineSecMatch[1], 10);
+      if (inlineMinMatch) inlineRestSec = parseInt(inlineMinMatch[1], 10) * 60;
+
+      for (let r = 1; r <= reps; r++) {
+        blocks.push({
+          id: `b_${blockIdx++}`,
+          phaseType: 'work',
+          title: `Serie ${r} de ${reps} · ${meters}m`,
+          targetType: 'distance',
+          targetValue: distKm,
+          targetPace: extractedPace,
+          instructions: `Completa ${meters} metros a ritmo objetivo (${extractedPace}).`
+        });
+        blocks.push({
+          id: `b_${blockIdx++}`,
+          phaseType: 'recovery',
+          title: `Descanso ${r} de ${reps} · ${inlineRestSec}s`,
+          targetType: 'time',
+          targetValue: inlineRestSec,
+          instructions: 'Recupera caminando o trotando muy suave antes de la siguiente serie.'
+        });
+      }
+      continue;
+    }
+
+    // 3. Caso Series por kilómetros (ej. "3 bloques de 2.0 km a ritmo...")
+    const distKmSeriesMatch = line.match(/(\d+)\s*(?:repeticiones|series|bloques)\s*de\s*(\d+(?:\.\d+)?)\s*km\b/i);
+    if (distKmSeriesMatch) {
+      const reps = parseInt(distKmSeriesMatch[1], 10);
+      const kmVal = parseFloat(distKmSeriesMatch[2]);
+      const restSec = standaloneRecoverySec || 120;
+
+      for (let r = 1; r <= reps; r++) {
+        blocks.push({
+          id: `b_${blockIdx++}`,
+          phaseType: 'work',
+          title: `Serie ${r} de ${reps} · ${kmVal} km`,
+          targetType: 'distance',
+          targetValue: kmVal,
+          targetPace: extractedPace,
+          instructions: `Completa ${kmVal} km a ritmo controlado (${extractedPace}).`
+        });
+        if (r < reps) {
+          blocks.push({
+            id: `b_${blockIdx++}`,
+            phaseType: 'recovery',
+            title: `Descanso ${r} de ${reps - 1} · ${restSec}s`,
+            targetType: 'time',
+            targetValue: restSec,
+            instructions: 'Trote regenerativo entre bloques.'
+          });
+        }
+      }
+      continue;
+    }
+
+    // 4. Caso bloque único de distancia en km (ej. "2.0 km de trote suave de calentamiento", "5.0 km continuos...", "1.5 km de vuelta a la calma")
+    const singleKmMatch = line.match(/(\d+(?:\.\d+)?)\s*km\b/i);
+    if (singleKmMatch) {
+      const kmVal = parseFloat(singleKmMatch[1]);
+      const isWarmup = lower.includes('calentamiento') || lower.includes('activación') || (i === 0 && session.structure.length >= 3 && lower.includes('suave'));
+      const isCooldown = lower.includes('calma') || lower.includes('enfriamiento') || lower.includes('regenerativo final') || (i === session.structure.length - 1 && session.structure.length >= 3 && lower.includes('suave'));
+
+      blocks.push({
+        id: `b_${blockIdx++}`,
+        phaseType: isWarmup ? 'warmup' : isCooldown ? 'cooldown' : 'work',
+        title: isWarmup
+          ? `Calentamiento · ${kmVal} km`
+          : isCooldown
+            ? `Vuelta a la calma · ${kmVal} km`
+            : `Bloque Principal · ${kmVal} km`,
+        targetType: 'distance',
+        targetValue: kmVal,
+        targetPace: extractedPace,
+        instructions: line
+      });
+      continue;
+    }
+
+    // 5. Caso calentamiento o movilidad por minutos al inicio (ej. "5 min de movilidad...", "10 min de calentamiento...")
+    const singleMinMatch = line.match(/^(\d+)\s*(?:min|minutos)\b/i);
+    if (singleMinMatch) {
+      const mins = parseInt(singleMinMatch[1], 10);
+      blocks.push({
+        id: `b_${blockIdx++}`,
+        phaseType: 'warmup',
+        title: `Activación / Movilidad · ${mins} min`,
+        targetType: 'time',
+        targetValue: mins * 60,
+        instructions: line
+      });
+    }
+  }
+
+  // Fallback de seguridad si ninguna línea produjo bloques
+  if (blocks.length === 0) {
+    blocks.push({
+      id: 'b_1',
+      phaseType: 'work',
+      title: `${session.name} · ${session.distanceKm} km`,
+      targetType: 'distance',
+      targetValue: session.distanceKm,
+      targetPace: session.targetPaceLabel,
+      instructions: session.focus
+    });
+  }
+
+  return blocks;
+};
+
+// Persistencia de Entrenamientos de Running Personalizados del usuario
+const getCustomRunningKey = (nickname: string) => `fitmax_custom_running_sessions_${nickname || 'guest'}`;
+
+export const getCustomRunningSessions = (nickname: string): PlannedRunningSession[] => {
+  try {
+    const raw = localStorage.getItem(getCustomRunningKey(nickname));
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+export const saveCustomRunningSession = (nickname: string, session: PlannedRunningSession): PlannedRunningSession[] => {
+  const current = getCustomRunningSessions(nickname);
+  const existsIdx = current.findIndex((s) => s.id === session.id);
+  const updated = existsIdx >= 0
+    ? current.map((s, idx) => (idx === existsIdx ? session : s))
+    : [session, ...current];
+  localStorage.setItem(getCustomRunningKey(nickname), JSON.stringify(updated));
+  return updated;
+};
+
+export const deleteCustomRunningSession = (nickname: string, id: string): PlannedRunningSession[] => {
+  const current = getCustomRunningSessions(nickname).filter((s) => s.id !== id);
+  localStorage.setItem(getCustomRunningKey(nickname), JSON.stringify(current));
+  return current;
+};
+

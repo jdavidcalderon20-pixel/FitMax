@@ -115,20 +115,42 @@ export default function ProfileModule({
             </div>
 
             <div className="flex-1 text-center sm:text-left">
-              <h2 className="text-xl font-black text-white">{nickname}</h2>
-              <div className="flex items-center justify-center sm:justify-start gap-2 mt-1">
-                {user ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                    <Cloud className="w-3.5 h-3.5" />
-                    Sincronizado en la nube ({user.email})
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">
-                    <Cloud className="w-3.5 h-3.5 text-zinc-500" />
-                    Guardado en este dispositivo (Modo local)
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                <h2 className="text-xl font-black text-white">{nickname}</h2>
+                {!user && nickname.toLowerCase() === 'invitado' && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                    Perfil Invitado
                   </span>
                 )}
               </div>
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 mt-1.5">
+                {user ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    <Cloud className="w-3.5 h-3.5" />
+                    Cuenta Personal Activa ({user.email})
+                  </span>
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-zinc-800 text-zinc-400 border border-zinc-700">
+                      <Cloud className="w-3.5 h-3.5 text-zinc-500" />
+                      Modo local en este dispositivo
+                    </span>
+                    <button
+                      type="button"
+                      onClick={onOpenCloudSync}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black bg-[#1FD08A] hover:bg-[#19b879] text-zinc-950 transition-all shadow-sm cursor-pointer"
+                    >
+                      <Sparkles className="w-3 h-3" />
+                      <span>Crear Cuenta Personal / Iniciar Sesión</span>
+                    </button>
+                  </>
+                )}
+              </div>
+              {!user && (
+                <p className="text-[11px] text-zinc-400 mt-2">
+                  Crea tu cuenta personal gratuita con Correo o Google para sincronizar tus rutinas personalizadas, marcas y tus grupos de <strong>Mi Gente</strong> en cualquier celular.
+                </p>
+              )}
             </div>
           </div>
 

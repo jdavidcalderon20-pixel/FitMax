@@ -177,7 +177,7 @@ export default function WelcomeScreen({
           Entrenamiento inteligente
         </p>
         <p className="text-zinc-400 text-xs mt-1 max-w-sm">
-          Planifica tus mesociclos de hipertrofia, running 80/20 y sincroniza tus marcas con tu combo.
+          Planifica tus mesociclos de hipertrofia, running guiado por bloques y comparte rutinas en <strong>Mi Gente</strong>.
         </p>
 
         {/* SELECTOR DE MODO */}
@@ -202,7 +202,7 @@ export default function WelcomeScreen({
             }`}
           >
             <Cloud className="w-3.5 h-3.5" />
-            <span>Sincronizar Cuenta</span>
+            <span>Cuenta Personal</span>
           </button>
         </div>
 

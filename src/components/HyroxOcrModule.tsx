@@ -85,6 +85,85 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
   // Modal de Simulacro Oficial Hyrox (Día de Carrera)
   const [showRaceSimulator, setShowRaceSimulator] = useState(false);
 
+  // Rutinas Hyrox Personalizadas creadas por el atleta
+  const [customHyroxSessions, setCustomHyroxSessions] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem(`fitmax_custom_hyrox_sessions_${nickname || 'guest'}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showCustomHyroxModal, setShowCustomHyroxModal] = useState(false);
+  const [customHyroxTitle, setCustomHyroxTitle] = useState('Mi WOD Hyrox Personalizado');
+  const [customHyroxRounds, setCustomHyroxRounds] = useState('4');
+  const [customHyroxRunMeters, setCustomHyroxRunMeters] = useState('800');
+  const [customHyroxBlocks, setCustomHyroxBlocks] = useState<{ name: string; detail: string }[]>([
+    { name: 'SkiErg', detail: '500m a ritmo constante de carrera' },
+    { name: 'Sled Push (Empuje de trineo)', detail: '25m pesados con zancada corta' },
+    { name: 'Burpee Broad Jumps', detail: '40m continuos controlando respiración' },
+    { name: 'Wall Balls', detail: '40 repeticiones profundas sin soltar balón' }
+  ]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(`fitmax_custom_hyrox_sessions_${nickname || 'guest'}`);
+      setCustomHyroxSessions(saved ? JSON.parse(saved) : []);
+    } catch {
+      setCustomHyroxSessions([]);
+    }
+  }, [nickname]);
+
+  const handleSaveCustomHyroxSession = () => {
+    const roundsNum = Math.max(1, parseInt(customHyroxRounds, 10) || 4);
+    const runM = Math.max(0, parseInt(customHyroxRunMeters, 10) || 500);
+    const validBlocks = customHyroxBlocks.filter((b) => b.name.trim());
+    if (validBlocks.length === 0) return;
+
+    const newSession = {
+      id: `custom_hyrox_${Date.now()}`,
+      isCustom: true,
+      title: customHyroxTitle.trim() || `WOD Hyrox (${roundsNum} Rondas)`,
+      focus: `${roundsNum} rondas intercalando ${runM}m de carrera comprometida con tus estaciones personalizadas.`,
+      warmup: '10 min trote Z2 + movilidad de cadera, tobillos y hombros + 2 activaciones cortas.',
+      isCompromisedDay: true,
+      structureGuide: `Realiza ${roundsNum} vueltas totales: en cada vuelta corre ${runM}m y ejecuta las estaciones en orden. Usa el botón Vuelta (LAP) arriba para medir el tiempo exacto de cada ronda.`,
+      blocks: [
+        ...(runM > 0
+          ? [
+              {
+                name: `Carrera Comprometida (${runM}m por ronda)`,
+                detail: `${roundsNum} rondas × ${runM}m a ritmo sostenible tras cada estación.`,
+                isCompromised: true,
+              },
+            ]
+          : []),
+        ...validBlocks.map((b) => ({
+          name: b.name.trim(),
+          detail: `${b.detail.trim() || 'Ejecución técnica constante'} (${roundsNum} rondas)`,
+          isCompromised: true,
+        })),
+      ],
+    };
+
+    const next = [...customHyroxSessions, newSession];
+    setCustomHyroxSessions(next);
+    try {
+      localStorage.setItem(`fitmax_custom_hyrox_sessions_${nickname || 'guest'}`, JSON.stringify(next));
+    } catch {}
+    setShowCustomHyroxModal(false);
+    setActiveDay(4 + next.length - 1);
+  };
+
+  const handleDeleteCustomHyroxSession = (id: string) => {
+    const next = customHyroxSessions.filter((s) => s.id !== id);
+    setCustomHyroxSessions(next);
+    try {
+      localStorage.setItem(`fitmax_custom_hyrox_sessions_${nickname || 'guest'}`, JSON.stringify(next));
+    } catch {}
+    setActiveDay(0);
+  };
+
   // Consola de tiempos de entrenamiento Hyrox (Ronda actual + Total + Laps)
   const [hyroxWorkoutActive, setHyroxWorkoutActive] = useState<boolean>(false);
   const [hyroxWorkoutPaused, setHyroxWorkoutPaused] = useState<boolean>(false);
@@ -339,12 +418,13 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
   const phaseInfo = getPhaseFromWeeks(weeksRemaining, targetWeeks);
   const activePhase: PeriodizationPhase = phaseInfo.phase;
 
-  // Generación de semana con bloques combinados y periodización
-  const sessions = discipline === 'hyrox' 
+  // Generación de semana con bloques combinados y periodización + rutinas personalizadas Hyrox
+  const baseSessions = discipline === 'hyrox' 
     ? generateHyroxWeek(hyroxLevel, activePhase) 
     : generateOcrWeek(ocrLevel, activePhase, gripTier);
+  const sessions = discipline === 'hyrox' ? [...baseSessions, ...customHyroxSessions] : baseSessions;
 
-  const session = sessions[activeDay];
+  const session = sessions[activeDay] || sessions[0];
   const level = discipline === 'hyrox' ? hyroxLevel : ocrLevel;
   const dayKey = `${discipline}_${level}_day${activeDay}`;
 
@@ -396,6 +476,14 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => setShowCustomHyroxModal(true)}
+            className="flex items-center gap-1.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black px-3 py-2 rounded-xl text-xs transition-all shadow-md shrink-0 cursor-pointer active:scale-95"
+            title="Crear tu propia rutina o WOD Hyrox personalizado"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>+ Crear Rutina Hyrox</span>
+          </button>
           <button
             onClick={() => setShowRaceSimulator(true)}
             className="flex items-center gap-1.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-zinc-950 font-black px-3 py-2 rounded-xl text-xs transition-all shadow-md shadow-amber-500/10 shrink-0 cursor-pointer active:scale-95"
@@ -701,21 +789,27 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
         </div>
       </div>
 
-      {/* DÍAS SWITCHER */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
-        {sessions.map((s, i) => (
+      {/* DÍAS SWITCHER + RUTINAS HYROX PERSONALIZADAS */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+        {sessions.map((s: any, i) => (
           <button
-            key={i}
+            key={s.id || i}
             onClick={() => setActiveDay(i)}
-            className={`p-3 rounded-2xl border text-center transition-all cursor-pointer ${
+            className={`p-3 rounded-2xl border text-center transition-all cursor-pointer relative ${
               activeDay === i 
-                ? 'bg-[#C084FC]/20 border-[#C084FC] text-[#C084FC] font-black shadow-sm' 
+                ? s.isCustom
+                  ? 'bg-[#1FD08A]/20 border-[#1FD08A] text-[#1FD08A] font-black shadow-sm'
+                  : 'bg-[#C084FC]/20 border-[#C084FC] text-[#C084FC] font-black shadow-sm' 
                 : 'bg-[#20252C] border-[#282F38] text-[#A8B0BB] hover:border-[#38414D]'
             }`}
           >
-            <p className="text-[10px] font-black uppercase tracking-wider">Día {i + 1}</p>
+            <p className="text-[10px] font-black uppercase tracking-wider truncate">
+              {s.isCustom ? `✨ ${s.title}` : `Día ${i + 1}`}
+            </p>
             {completed[`${discipline}_${level}_day${i}`] ? (
               <CheckCircle2 className="w-4 h-4 text-[#1FD08A] mx-auto mt-1" />
+            ) : s.isCustom ? (
+              <span className="text-[9px] font-black text-[#1FD08A] block mt-1">Personalizada</span>
             ) : s.isCompromisedDay ? (
               <span className="text-[9px] font-black text-[#C084FC] block mt-1">Metabólico</span>
             ) : null}
@@ -727,12 +821,22 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
       {session && (
         <div className="flex-1 overflow-y-auto space-y-3">
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-black text-[#F4F2ED]">{session.title}</h3>
-              {session.isCompromisedDay && (
-                <span className="bg-[#C084FC]/20 text-[#C084FC] text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border border-[#C084FC]/30">
-                  Correr con piernas cansadas
-                </span>
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-lg font-black text-[#F4F2ED]">{session.title}</h3>
+                {session.isCompromisedDay && (
+                  <span className="bg-[#C084FC]/20 text-[#C084FC] text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full border border-[#C084FC]/30">
+                    Correr con piernas cansadas
+                  </span>
+                )}
+              </div>
+              {(session as any).isCustom && (
+                <button
+                  onClick={() => handleDeleteCustomHyroxSession((session as any).id)}
+                  className="text-[11px] font-bold text-rose-400 hover:underline cursor-pointer"
+                >
+                  Eliminar rutina personalizada
+                </button>
               )}
             </div>
             <p className="text-xs text-[#A8B0BB] mt-0.5">{session.focus}</p>
@@ -1553,6 +1657,149 @@ export default function HyroxOcrModule({ nickname }: HyroxOcrModuleProps) {
           nickname={nickname}
           onClose={() => setShowRaceSimulator(false)}
         />
+      )}
+
+      {/* MODAL CREADOR DE RUTINA / WOD HYROX PERSONALIZADO */}
+      {showCustomHyroxModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#15181D] border border-[#282F38] rounded-3xl w-full max-w-lg p-5 text-white shadow-2xl space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-[#282F38] pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A] block">
+                  Hyrox Personalizado
+                </span>
+                <h3 className="text-base font-black text-white">Crear Rutina / WOD Hyrox</h3>
+              </div>
+              <button
+                onClick={() => setShowCustomHyroxModal(false)}
+                className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-[#20252C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs overflow-y-auto flex-1 pr-1">
+              <div>
+                <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Nombre de tu WOD Hyrox</label>
+                <input
+                  type="text"
+                  value={customHyroxTitle}
+                  onChange={(e) => setCustomHyroxTitle(e.target.value)}
+                  placeholder="Ej: Mi WOD Hyrox de Sábado"
+                  className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">N° de Rondas / Vueltas</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="12"
+                    value={customHyroxRounds}
+                    onChange={(e) => setCustomHyroxRounds(e.target.value)}
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Carrera por ronda (metros)</label>
+                  <input
+                    type="number"
+                    step="100"
+                    min="0"
+                    value={customHyroxRunMeters}
+                    onChange={(e) => setCustomHyroxRunMeters(e.target.value)}
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-[#A8B0BB]">
+                    Estaciones / Ejercicios de la rutina ({customHyroxBlocks.length})
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCustomHyroxBlocks((prev) => [
+                        ...prev,
+                        { name: 'Farmers Carry', detail: '100m con mancuernas pesadas' },
+                      ])
+                    }
+                    className="text-[11px] font-bold text-[#1FD08A] hover:underline cursor-pointer"
+                  >
+                    + Añadir estación
+                  </button>
+                </div>
+
+                {customHyroxBlocks.map((blk, bIdx) => (
+                  <div
+                    key={bIdx}
+                    className="bg-[#20252C] border border-[#282F38] rounded-xl p-2.5 space-y-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded">
+                        #{bIdx + 1}
+                      </span>
+                      <input
+                        type="text"
+                        value={blk.name}
+                        onChange={(e) => {
+                          const next = [...customHyroxBlocks];
+                          next[bIdx] = { ...next[bIdx], name: e.target.value };
+                          setCustomHyroxBlocks(next);
+                        }}
+                        placeholder="Nombre estación (ej: Wall Balls, Remo, Sled Push...)"
+                        className="flex-1 bg-[#15181D] border border-[#282F38] rounded-lg px-2.5 py-1.5 text-white font-bold text-xs focus:outline-none focus:border-[#1FD08A]"
+                      />
+                      {customHyroxBlocks.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setCustomHyroxBlocks((prev) => prev.filter((_, idx) => idx !== bIdx))
+                          }
+                          className="text-zinc-500 hover:text-rose-400 p-1 cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      value={blk.detail}
+                      onChange={(e) => {
+                        const next = [...customHyroxBlocks];
+                        next[bIdx] = { ...next[bIdx], detail: e.target.value };
+                        setCustomHyroxBlocks(next);
+                      }}
+                      placeholder="Distancia o repeticiones (ej: 500m o 30 reps con 20kg)"
+                      className="w-full bg-[#15181D] border border-[#282F38] rounded-lg px-2.5 py-1.5 text-[#A8B0BB] text-xs focus:outline-none focus:border-[#1FD08A]"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-[#282F38]">
+              <button
+                type="button"
+                onClick={() => setShowCustomHyroxModal(false)}
+                className="flex-1 py-2.5 bg-[#20252C] hover:bg-[#282F38] text-[#A8B0BB] font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveCustomHyroxSession}
+                className="flex-1 py-2.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs cursor-pointer"
+              >
+                Guardar Rutina Hyrox
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

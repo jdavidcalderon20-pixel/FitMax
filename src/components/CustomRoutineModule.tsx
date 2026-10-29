@@ -61,8 +61,33 @@ export default function CustomRoutineModule({
   const [selectedMuscleFilter, setSelectedMuscleFilter] = useState<string>('Todos');
 
   // Vista de sesión activa (WorkoutSessionView)
-  const [trainingDay, setTrainingDay] = useState<{ day: CustomRoutineDay; routineName: string } | null>(null);
+  const [trainingDay, setTrainingDay] = useState<{ day: CustomRoutineDay; routineName: string; routineId: string } | null>(null);
   const [inspectedExercise, setInspectedExercise] = useState<ExerciseDetail | null>(null);
+
+  // Progreso de semanas e historial de sesiones de rutinas personalizadas
+  const [routineProgress, setRoutineProgress] = useState<
+    Record<string, { currentWeek: number; completedDays: Record<string, number>; history: { date: number; dayName: string; week: number }[] }>
+  >(() => {
+    try {
+      const raw = localStorage.getItem(`fit_custom_routine_progress_${nickname}`);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const saveProgressState = (next: typeof routineProgress) => {
+    setRoutineProgress(next);
+    try {
+      localStorage.setItem(`fit_custom_routine_progress_${nickname}`, JSON.stringify(next));
+    } catch {}
+  };
+
+  const cleanNumericReps = (val: string) => {
+    return String(val || '8-10')
+      .replace(/reps?|repeticiones/gi, '')
+      .trim() || '8-10';
+  };
 
   // Recargar rutinas
   const reloadRoutines = () => {
@@ -98,7 +123,7 @@ export default function CustomRoutineModule({
               name: 'Press de banca con barra',
               category: 'Pecho',
               defaultSets: 4,
-              defaultReps: '6 a 8 reps',
+              defaultReps: '6-8',
               restSeconds: 90
             },
             {
@@ -106,7 +131,7 @@ export default function CustomRoutineModule({
               name: 'Remo Pendlay con barra (Dead-Stop desde el suelo)',
               category: 'Espalda',
               defaultSets: 4,
-              defaultReps: '6 a 8 reps',
+              defaultReps: '6-8',
               restSeconds: 90
             }
           ]
@@ -121,7 +146,7 @@ export default function CustomRoutineModule({
               name: 'Sentadilla trasera con barra (Back Squat)',
               category: 'Cuádriceps',
               defaultSets: 4,
-              defaultReps: '6 a 8 reps',
+              defaultReps: '6-8',
               restSeconds: 120
             },
             {
@@ -129,7 +154,7 @@ export default function CustomRoutineModule({
               name: 'Hip Thrust con barra (o mancuerna)',
               category: 'Glúteos',
               defaultSets: 4,
-              defaultReps: '8 a 10 reps',
+              defaultReps: '8-10',
               restSeconds: 90
             }
           ]
@@ -241,7 +266,7 @@ export default function CustomRoutineModule({
       name: ex.name,
       category: ex.muscleGroup,
       defaultSets: 4,
-      defaultReps: '8 a 10 reps',
+      defaultReps: '8-10',
       restSeconds: 90,
       description: ex.targetFocus
     };
@@ -264,7 +289,7 @@ export default function CustomRoutineModule({
           name: e.name,
           category: e.category,
           defaultSets: e.defaultSets,
-          defaultReps: e.defaultReps,
+          defaultReps: `${cleanNumericReps(e.defaultReps)} reps`,
           restSeconds: e.restSeconds,
           description: e.description
         }))}
@@ -272,8 +297,24 @@ export default function CustomRoutineModule({
         nickname={nickname}
         onClose={() => setTrainingDay(null)}
         onFinishWorkout={() => {
+          const rId = trainingDay.routineId;
+          const prevProg = routineProgress[rId] || { currentWeek: 1, completedDays: {}, history: [] };
+          const dayKey = `w${prevProg.currentWeek}_d${trainingDay.day.id}`;
+          const nextCompleted = { ...prevProg.completedDays, [dayKey]: Date.now() };
+          const nextHistory = [
+            { date: Date.now(), dayName: trainingDay.day.name, week: prevProg.currentWeek },
+            ...(prevProg.history || []).slice(0, 49)
+          ];
+          saveProgressState({
+            ...routineProgress,
+            [rId]: {
+              ...prevProg,
+              completedDays: nextCompleted,
+              history: nextHistory
+            }
+          });
           setTrainingDay(null);
-          if (onNotification) onNotification(`¡Entrenamiento "${trainingDay.day.name}" completado! 🏆`);
+          if (onNotification) onNotification(`¡Entrenamiento "${trainingDay.day.name}" registrado en tu historial! 🏆`);
         }}
         onNotification={onNotification}
       />
@@ -372,13 +413,13 @@ export default function CustomRoutineModule({
       {/* DETALLE O EDITOR DE LA RUTINA ACTIVA */}
       {activeRoutine && !isEditing && (
         <div className="space-y-4">
-          {/* BARRA SUPERIOR DE ACCIONES DE LA RUTINA */}
+          {/* BARRA SUPERIOR DE ACCIONES Y PROGRESO POR SEMANA DE LA RUTINA */}
           <div className="bg-[#20252C] rounded-3xl p-4 sm:p-5 border border-[#282F38] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base sm:text-lg font-black text-white">{activeRoutine.name}</h3>
-                <span className="text-[10px] bg-[#15181D] border border-[#282F38] px-2.5 py-0.5 rounded-full text-[#A8B0BB] font-mono">
-                  {activeRoutine.targetWeeks} semanas programadas
+                <span className="text-[10px] bg-[#1FD08A]/15 border border-[#1FD08A]/30 px-2.5 py-0.5 rounded-full text-[#1FD08A] font-black font-mono">
+                  Semana {routineProgress[activeRoutine.id]?.currentWeek || 1} de {activeRoutine.targetWeeks}
                 </span>
               </div>
               {activeRoutine.description && (
@@ -386,7 +427,43 @@ export default function CustomRoutineModule({
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Stepper de Semana de la Rutina Personalizada */}
+              <div className="flex items-center gap-1 bg-[#15181D] border border-[#282F38] rounded-xl px-2 py-1">
+                <span className="text-[10px] text-[#A8B0BB] font-bold mr-1">Semana:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const prevProg = routineProgress[activeRoutine.id] || { currentWeek: 1, completedDays: {}, history: [] };
+                    const nextW = Math.max(1, prevProg.currentWeek - 1);
+                    saveProgressState({
+                      ...routineProgress,
+                      [activeRoutine.id]: { ...prevProg, currentWeek: nextW }
+                    });
+                  }}
+                  className="w-6 h-6 rounded-lg bg-[#20252C] hover:bg-[#282F38] text-xs font-black text-white"
+                >
+                  -
+                </button>
+                <span className="text-xs font-mono font-black text-[#1FD08A] px-1.5">
+                  {routineProgress[activeRoutine.id]?.currentWeek || 1}/{activeRoutine.targetWeeks}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const prevProg = routineProgress[activeRoutine.id] || { currentWeek: 1, completedDays: {}, history: [] };
+                    const nextW = Math.min(activeRoutine.targetWeeks, prevProg.currentWeek + 1);
+                    saveProgressState({
+                      ...routineProgress,
+                      [activeRoutine.id]: { ...prevProg, currentWeek: nextW }
+                    });
+                  }}
+                  className="w-6 h-6 rounded-lg bg-[#20252C] hover:bg-[#282F38] text-xs font-black text-white"
+                >
+                  +
+                </button>
+              </div>
+
               <button
                 type="button"
                 onClick={() => {
@@ -412,67 +489,126 @@ export default function CustomRoutineModule({
 
           {/* DÍAS DE LA RUTINA */}
           <div className="grid grid-cols-1 gap-4">
-            {activeRoutine.days.map((day) => (
-              <div
-                key={day.id}
-                className="bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 shadow-lg space-y-4"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#282F38]">
-                  <div>
-                    <span className="text-[10px] font-black uppercase text-[#1FD08A] tracking-wider">
-                      Día {day.id} de {activeRoutine.days.length}
-                    </span>
-                    <h4 className="text-sm sm:text-base font-black text-white mt-0.5">{day.name}</h4>
-                    {day.subtitle && <p className="text-xs text-[#A8B0BB]">{day.subtitle}</p>}
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setTrainingDay({ day, routineName: activeRoutine.name })}
-                    className="flex items-center gap-2 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black px-4 py-2.5 rounded-xl text-xs transition-all shadow-[0_4px_15px_rgba(31,208,138,0.25)] self-start sm:self-auto cursor-pointer active:scale-95"
-                  >
-                    <Play className="w-4 h-4 fill-current" />
-                    <span>Entrenar este día</span>
-                  </button>
-                </div>
-
-                {/* LISTADO DE EJERCICIOS DEL DÍA */}
-                {day.exercises.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                    {day.exercises.map((ex, exIdx) => (
-                      <div
-                        key={ex.id || exIdx}
-                        onClick={() => setInspectedExercise(findExerciseDetail(ex.name))}
-                        className="bg-[#15181D] hover:bg-[#282F38] border border-[#282F38] hover:border-[#1FD08A]/40 rounded-2xl p-3 transition-all cursor-pointer group flex flex-col justify-between"
-                      >
-                        <div>
-                          <div className="flex items-center justify-between gap-2 mb-1">
-                            <span className="text-[10px] font-bold text-[#A8B0BB] bg-[#20252C] px-2 py-0.5 rounded-lg">
-                              {ex.category}
-                            </span>
-                            <span className="text-[10px] font-mono font-bold text-[#1FD08A] bg-[#1FD08A]/10 px-2 py-0.5 rounded-lg">
-                              {ex.defaultSets} × {ex.defaultReps}
-                            </span>
-                          </div>
-                          <p className="text-xs font-black text-white group-hover:text-[#1FD08A] transition-colors line-clamp-2">
-                            {ex.name}
-                          </p>
-                        </div>
-                        <div className="mt-2 pt-2 border-t border-[#282F38]/50 flex items-center justify-between text-[10px] text-[#A8B0BB]">
-                          <span>⏱️ {ex.restSeconds || 90}s descanso</span>
-                          <span className="text-[#1FD08A] font-bold">Ver técnica</span>
-                        </div>
+            {activeRoutine.days.map((day) => {
+              const curWeek = routineProgress[activeRoutine.id]?.currentWeek || 1;
+              const isDayDoneThisWeek = Boolean(
+                routineProgress[activeRoutine.id]?.completedDays?.[`w${curWeek}_d${day.id}`]
+              );
+              return (
+                <div
+                  key={day.id}
+                  className={`bg-[#20252C] border rounded-3xl p-4 sm:p-5 shadow-lg space-y-4 ${
+                    isDayDoneThisWeek ? 'border-[#1FD08A]/50' : 'border-[#282F38]'
+                  }`}
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#282F38]">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase text-[#1FD08A] tracking-wider">
+                          Día {day.id} de {activeRoutine.days.length} · Semana {curWeek}
+                        </span>
+                        {isDayDoneThisWeek && (
+                          <span className="text-[10px] font-black bg-[#1FD08A]/15 text-[#1FD08A] border border-[#1FD08A]/30 px-2 py-0.5 rounded-full">
+                            Completado esta semana ✓
+                          </span>
+                        )}
                       </div>
-                    ))}
+                      <h4 className="text-sm sm:text-base font-black text-white mt-0.5">{day.name}</h4>
+                      {day.subtitle && <p className="text-xs text-[#A8B0BB]">{day.subtitle}</p>}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setTrainingDay({ day, routineName: activeRoutine.name, routineId: activeRoutine.id })}
+                      className="flex items-center gap-2 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black px-4 py-2.5 rounded-xl text-xs transition-all shadow-[0_4px_15px_rgba(31,208,138,0.25)] self-start sm:self-auto cursor-pointer active:scale-95"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      <span>{isDayDoneThisWeek ? 'Repetir este día' : 'Entrenar este día'}</span>
+                    </button>
                   </div>
-                ) : (
-                  <p className="text-xs text-[#A8B0BB] italic py-2">
-                    No has agregado ejercicios a este día todavía. Edita la rutina para añadir ejercicios.
-                  </p>
-                )}
-              </div>
-            ))}
+
+                  {/* LISTADO DE EJERCICIOS DEL DÍA */}
+                  {day.exercises.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                      {day.exercises.map((ex, exIdx) => (
+                        <div
+                          key={ex.id || exIdx}
+                          onClick={() => setInspectedExercise(findExerciseDetail(ex.name))}
+                          className="bg-[#15181D] hover:bg-[#282F38] border border-[#282F38] hover:border-[#1FD08A]/40 rounded-2xl p-3 transition-all cursor-pointer group flex flex-col justify-between"
+                        >
+                          <div>
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-[10px] font-bold text-[#A8B0BB] bg-[#20252C] px-2 py-0.5 rounded-lg">
+                                {ex.category}
+                              </span>
+                              <span className="text-[10px] font-mono font-bold text-[#1FD08A] bg-[#1FD08A]/10 px-2 py-0.5 rounded-lg">
+                                {ex.defaultSets} × {cleanNumericReps(ex.defaultReps)} reps
+                              </span>
+                            </div>
+                            <p className="text-xs font-black text-white group-hover:text-[#1FD08A] transition-colors line-clamp-2">
+                              {ex.name}
+                            </p>
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-[#282F38]/50 flex items-center justify-between text-[10px] text-[#A8B0BB]">
+                            <span>⏱️ {ex.restSeconds || 90}s descanso</span>
+                            <span className="text-[#1FD08A] font-bold">Ver técnica</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-[#A8B0BB] italic py-2">
+                      No has agregado ejercicios a este día todavía. Edita la rutina para añadir ejercicios.
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
+
+          {/* HISTORIAL DE SESIONES REALIZADAS CON ESTA RUTINA */}
+          {(routineProgress[activeRoutine.id]?.history?.length || 0) > 0 && (
+            <div className="bg-[#20252C] border border-[#282F38] rounded-3xl p-4 sm:p-5 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-black uppercase tracking-wider text-[#1FD08A]">
+                  Historial de sesiones realizadas ({routineProgress[activeRoutine.id].history.length})
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm('¿Deseas reiniciar la rutina a la Semana 1 para volver a realizarla conservando tu historial?')) {
+                      const prevProg = routineProgress[activeRoutine.id];
+                      saveProgressState({
+                        ...routineProgress,
+                        [activeRoutine.id]: {
+                          ...prevProg,
+                          currentWeek: 1,
+                          completedDays: {}
+                        }
+                      });
+                      if (onNotification) onNotification('Rutina reiniciada a la Semana 1 lista para un nuevo ciclo.');
+                    }
+                  }}
+                  className="text-[11px] font-bold text-[#5B8DEF] hover:underline cursor-pointer"
+                >
+                  Reiniciar ciclo a Semana 1
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {routineProgress[activeRoutine.id].history.slice(0, 8).map((h, i) => (
+                  <span
+                    key={i}
+                    className="text-[11px] bg-[#15181D] border border-[#282F38] px-3 py-1 rounded-xl text-[#F4F2ED]"
+                  >
+                    ✓ <strong>{h.dayName}</strong> (Sem {h.week}) ·{' '}
+                    <span className="text-[#A8B0BB]">
+                      {new Date(h.date).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -617,14 +753,21 @@ export default function CustomRoutineModule({
                             />
                           </div>
 
-                          <div className="flex items-center gap-1 bg-[#15181D] px-2 py-1 rounded-lg border border-[#282F38]">
-                            <span className="text-[10px] text-[#A8B0BB] font-bold">Reps:</span>
+                          <div className="flex items-center gap-1 bg-[#15181D] px-2.5 py-1 rounded-lg border border-[#282F38]">
+                            <span className="text-[10px] text-[#A8B0BB] font-bold select-none">Reps:</span>
                             <input
                               type="text"
-                              value={ex.defaultReps}
-                              onChange={(e) => handleUpdateExConfig(dayIdx, exIdx, 'defaultReps', e.target.value)}
-                              className="w-16 bg-transparent text-center font-bold text-xs text-white outline-none"
+                              inputMode="text"
+                              placeholder="8-10"
+                              value={cleanNumericReps(ex.defaultReps)}
+                              onChange={(e) => {
+                                // Permitir únicamente dígitos, guion, 'a' o espacios para rangos (ej. "6-8" o "8 a 10"), sin permitir borrar/escribir la palabra "reps"
+                                const sanitized = e.target.value.replace(/reps?/gi, '').replace(/[^0-9a\-\s/]/gi, '');
+                                handleUpdateExConfig(dayIdx, exIdx, 'defaultReps', sanitized);
+                              }}
+                              className="w-12 bg-transparent text-center font-bold text-xs text-white outline-none focus:text-[#1FD08A]"
                             />
+                            <span className="text-[10px] text-[#A8B0BB] font-bold select-none">reps</span>
                           </div>
 
                           <button

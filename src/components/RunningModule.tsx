@@ -44,59 +44,66 @@ import {
   calculateRaceFinishTime, 
   formatPaceDecimal, 
   PlannedRunningSession,
-  getRunningCoachGuidance 
+  RunningWorkoutBlock,
+  getRunningCoachGuidance,
+  getCustomRunningSessions,
+  saveCustomRunningSession,
+  deleteCustomRunningSession
 } from '../lib/runningPlans';
 import { calculatePacesFrom10K } from '../data/runningPlansData';
 import { useAuth } from '../lib/auth';
 import AuthScreen from './AuthScreen';
-import RunningMap from './RunningMap';
 import RunningLiveTracker from './RunningLiveTracker';
-import StravaSyncModal from './StravaSyncModal';
 import RunActivityDetailModal from './RunActivityDetailModal';
-import { GeoPoint, generateGPXString, downloadGPXFile } from '../lib/gpx';
+import { GeoPoint } from '../lib/gpx';
 
 interface RunningModuleProps {
   nickname: string;
   onNotification?: (msg: string) => void;
 }
 
-const todayStr = (): string => new Date().toISOString().slice(0, 10);
-
 export default function RunningModule({ nickname, onNotification }: RunningModuleProps) {
   const { user, signOut } = useAuth();
   const [logs, setLogs] = useState<RunLog[]>([]);
   const [loadingCloud, setLoadingCloud] = useState(false);
-  const [showForm, setShowForm] = useState(false);
   const [showAuthScreen, setShowAuthScreen] = useState(false);
   const [showLiveTracker, setShowLiveTracker] = useState(false);
-  const [showStravaModal, setShowStravaModal] = useState(false);
+  const [trackerSession, setTrackerSession] = useState<PlannedRunningSession | null>(null);
   const [inspectedRouteLog, setInspectedRouteLog] = useState<RunLog | null>(null);
   const [hasLocalToSync, setHasLocalToSync] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
-  const [showRegisterMenu, setShowRegisterMenu] = useState(false);
 
   // Periodización hacia carrera / evento objetivo
   const [targetWeeks, setTargetWeeks] = useState<number>(12);
   const [weeksRemaining, setWeeksRemaining] = useState<number>(8);
-  const [showPeriodization, setShowPeriodization] = useState<boolean>(false);
   const [runningGoal, setRunningGoal] = useState<'salud_base' | 'ritmo_velocidad' | 'preparar_carrera'>('salud_base');
   const [showAdvancedPeriodization, setShowAdvancedPeriodization] = useState<boolean>(false);
-  const [formError, setFormError] = useState<string | null>(null);
 
-  // Plan de Entrenamiento Guiado
+  // Plan de Entrenamiento Guiado y Estados Reales (Completada vs Parcial/Incompleta)
   const [raceDistance, setRaceDistance] = useState<RaceDistance>('10K');
   const [targetPace, setTargetPace] = useState<number>(5.0); // 5:00 min/km por defecto
   const [completedPlanIds, setCompletedPlanIds] = useState<Record<string, boolean>>({});
+  const [partialPlanInfo, setPartialPlanInfo] = useState<
+    Record<string, { distanceKm: number; durationMin: number; completedBlocksCount: number; totalBlocksCount: number }>
+  >({});
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [showAllSessions, setShowAllSessions] = useState<boolean>(false);
 
-  const [formDate, setFormDate] = useState(todayStr());
-  const [formDistance, setFormDistance] = useState('');
-  const [formDuration, setFormDuration] = useState('');
-  const [formType, setFormType] = useState<RunType>('facil');
-  const [formRpe, setFormRpe] = useState(5);
-  const [formNotes, setFormNotes] = useState('');
+  // Rutinas de Running Personalizadas del usuario
+  const [customSessions, setCustomSessions] = useState<PlannedRunningSession[]>([]);
+  const [showCustomModal, setShowCustomModal] = useState<boolean>(false);
+  const [customName, setCustomName] = useState<string>('Mis Series 5 × 1000m');
+  const [customWarmupKm, setCustomWarmupKm] = useState<string>('2.0');
+  const [customReps, setCustomReps] = useState<string>('5');
+  const [customIntervalMeters, setCustomIntervalMeters] = useState<string>('1000');
+  const [customRestSec, setCustomRestSec] = useState<string>('90');
+  const [customCooldownKm, setCustomCooldownKm] = useState<string>('1.5');
+  const [customPaceLabel, setCustomPaceLabel] = useState<string>('4:30 min/km');
+
+  useEffect(() => {
+    setCustomSessions(getCustomRunningSessions(nickname));
+  }, [nickname]);
 
   // Con sesión activa, los datos viven en Supabase (sincronizados entre dispositivos); sin
   // sesión, se usa el almacenamiento local de siempre, sin ningún cambio de comportamiento.
@@ -123,6 +130,8 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
       if (savedPace) setTargetPace(parseFloat(savedPace) || 5.0);
       const savedCompleted = localStorage.getItem(`fit_gen_${nickname}_running_plan_completed`);
       if (savedCompleted) setCompletedPlanIds(JSON.parse(savedCompleted));
+      const savedPartial = localStorage.getItem(`fit_gen_${nickname}_running_plan_partial`);
+      if (savedPartial) setPartialPlanInfo(JSON.parse(savedPartial));
     } catch (e) {
       setLogs([]);
     }
@@ -147,10 +156,11 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
       localStorage.setItem(`fit_gen_${nickname}_running_race_dist`, raceDistance);
       localStorage.setItem(`fit_gen_${nickname}_running_target_pace`, String(targetPace));
       localStorage.setItem(`fit_gen_${nickname}_running_plan_completed`, JSON.stringify(completedPlanIds));
+      localStorage.setItem(`fit_gen_${nickname}_running_plan_partial`, JSON.stringify(partialPlanInfo));
     } catch (e) {
       console.error(e);
     }
-  }, [targetWeeks, weeksRemaining, raceDistance, targetPace, completedPlanIds, nickname]);
+  }, [targetWeeks, weeksRemaining, raceDistance, targetPace, completedPlanIds, partialPlanInfo, nickname]);
 
   useEffect(() => {
     if (user && nickname) {
@@ -182,16 +192,6 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
     setTimeout(() => setSyncMsg(null), 5000);
   };
 
-  const resetForm = () => {
-    setFormDate(todayStr());
-    setFormDistance('');
-    setFormDuration('');
-    setFormType('facil');
-    setFormRpe(5);
-    setFormNotes('');
-    setFormError(null);
-  };
-
   const handleSelectGoal = (goal: 'salud_base' | 'ritmo_velocidad' | 'preparar_carrera') => {
     setRunningGoal(goal);
     if (goal === 'salud_base') {
@@ -208,58 +208,22 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
     }
   };
 
-  const handleAddRun = async () => {
-    setFormError(null);
-    const cleanDist = formDistance.replace(',', '.').trim();
-    const cleanDur = formDuration.replace(',', '.').trim();
-    const distanceKm = parseFloat(cleanDist);
-    const durationMin = parseFloat(cleanDur);
-
-    if (isNaN(distanceKm) || distanceKm <= 0) {
-      setFormError('Por favor ingresa una distancia válida en km (ej: 5 o 3.5).');
-      return;
+  const handleSaveTrackedRun = async (
+    data: {
+      distanceKm: number;
+      durationMin: number;
+      type: RunType;
+      rpe: number;
+      notes?: string;
+      route: GeoPoint[];
+    },
+    completionMeta?: {
+      plannedSessionId?: string;
+      status: 'completed' | 'partial';
+      completedBlocksCount: number;
+      totalBlocksCount: number;
     }
-    if (isNaN(durationMin) || durationMin <= 0) {
-      setFormError('Por favor ingresa una duración válida en minutos (ej: 25 o 45).');
-      return;
-    }
-
-    const draft = {
-      date: new Date(formDate).getTime(),
-      distanceKm,
-      durationMin,
-      type: formType,
-      rpe: formRpe,
-      notes: formNotes.trim() || undefined,
-    };
-
-    if (user) {
-      const saved = await addRunLogCloud(user.id, draft);
-      if (saved) setLogs((prev) => [...prev, saved]);
-    } else {
-      const newLog: RunLog = {
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        ...draft,
-      };
-      setLogs((prev) => [...prev, newLog]);
-    }
-
-    if (onNotification) {
-      onNotification(`¡Carrera de ${distanceKm} km guardada con éxito!`);
-    }
-
-    resetForm();
-    setShowForm(false);
-  };
-
-  const handleSaveTrackedRun = async (data: {
-    distanceKm: number;
-    durationMin: number;
-    type: RunType;
-    rpe: number;
-    notes?: string;
-    route: GeoPoint[];
-  }) => {
+  ) => {
     const draft = {
       date: Date.now(),
       distanceKm: data.distanceKm,
@@ -280,17 +244,117 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
       };
       setLogs((prev) => [...prev, newLog]);
     }
+
+    if (completionMeta?.plannedSessionId) {
+      const sId = completionMeta.plannedSessionId;
+      if (completionMeta.status === 'completed') {
+        setCompletedPlanIds((prev) => ({ ...prev, [sId]: true }));
+        setPartialPlanInfo((prev) => {
+          const next = { ...prev };
+          delete next[sId];
+          return next;
+        });
+        setSyncMsg(`¡Sesión completada al 100%! (${data.distanceKm} km registrados en tu historial)`);
+      } else {
+        setCompletedPlanIds((prev) => {
+          const next = { ...prev };
+          delete next[sId];
+          return next;
+        });
+        setPartialPlanInfo((prev) => ({
+          ...prev,
+          [sId]: {
+            distanceKm: data.distanceKm,
+            durationMin: data.durationMin,
+            completedBlocksCount: completionMeta.completedBlocksCount,
+            totalBlocksCount: completionMeta.totalBlocksCount,
+          },
+        }));
+        setSyncMsg(`Avance real guardado (${data.distanceKm} km). La sesión queda marcada como Parcial / En curso.`);
+      }
+      setTimeout(() => setSyncMsg(null), 5000);
+    }
   };
 
-  const handleDownloadLogGPX = (log: RunLog) => {
-    if (!log.route || log.route.length === 0) {
-      if (onNotification) onNotification('Esta sesión no contiene trazado GPS para exportar.');
-      return;
+  const handleCreateCustomRunningSession = () => {
+    const warmupKm = Math.max(0, parseFloat(customWarmupKm.replace(',', '.')) || 0);
+    const reps = Math.max(1, parseInt(customReps, 10) || 1);
+    const meters = Math.max(100, parseInt(customIntervalMeters, 10) || 1000);
+    const restSec = Math.max(0, parseInt(customRestSec, 10) || 60);
+    const cooldownKm = Math.max(0, parseFloat(customCooldownKm.replace(',', '.')) || 0);
+    const intervalKm = Math.round((meters / 1000) * 1000) / 1000;
+    const totalKm = Math.round((warmupKm + reps * intervalKm + cooldownKm) * 100) / 100;
+
+    const customBlocks: RunningWorkoutBlock[] = [];
+    let bIdx = 1;
+    if (warmupKm > 0) {
+      customBlocks.push({
+        id: `cb_${bIdx++}`,
+        phaseType: 'warmup',
+        title: `Calentamiento · ${warmupKm} km`,
+        targetType: 'distance',
+        targetValue: warmupKm,
+        instructions: `${warmupKm} km de trote suave de calentamiento.`
+      });
     }
-    const gpx = generateGPXString(`FitMax Carrera ${new Date(log.date).toLocaleDateString()}`, log.route);
-    const dateStr = new Date(log.date).toISOString().slice(0, 10);
-    downloadGPXFile(`FitMax_Carrera_${dateStr}_${log.distanceKm}km.gpx`, gpx);
-    if (onNotification) onNotification('¡Archivo GPX descargado! Listo para Strava.');
+    for (let r = 1; r <= reps; r++) {
+      customBlocks.push({
+        id: `cb_${bIdx++}`,
+        phaseType: 'work',
+        title: `Serie ${r} de ${reps} · ${meters}m`,
+        targetType: 'distance',
+        targetValue: intervalKm,
+        targetPace: customPaceLabel,
+        instructions: `Completa ${meters}m a ritmo objetivo (${customPaceLabel}).`
+      });
+      if (restSec > 0) {
+        customBlocks.push({
+          id: `cb_${bIdx++}`,
+          phaseType: 'recovery',
+          title: `Descanso ${r} de ${reps} · ${restSec}s`,
+          targetType: 'time',
+          targetValue: restSec,
+          instructions: `${restSec} segundos de recuperación antes del siguiente bloque.`
+        });
+      }
+    }
+    if (cooldownKm > 0) {
+      customBlocks.push({
+        id: `cb_${bIdx++}`,
+        phaseType: 'cooldown',
+        title: `Vuelta a la calma · ${cooldownKm} km`,
+        targetType: 'distance',
+        targetValue: cooldownKm,
+        instructions: `${cooldownKm} km de trote muy suave regenerativo.`
+      });
+    }
+
+    const structure: string[] = [];
+    if (warmupKm > 0) structure.push(`${warmupKm} km de trote suave de calentamiento.`);
+    structure.push(`${reps} repeticiones de ${meters}m exactos a ritmo objetivo (${customPaceLabel}).`);
+    if (restSec > 0) structure.push(`${restSec} segundos de recuperación entre cada serie.`);
+    if (cooldownKm > 0) structure.push(`${cooldownKm} km de trote suave de vuelta a la calma.`);
+
+    const newSession: PlannedRunningSession = {
+      id: `custom_run_${Date.now()}`,
+      dayTitle: 'Sesión Personalizada',
+      type: reps > 1 ? 'series' : 'tempo',
+      name: customName.trim() || `Series ${reps} × ${meters}m`,
+      distanceKm: Math.max(0.5, totalKm),
+      targetPaceLabel: customPaceLabel || '4:45 min/km',
+      estimatedDurationMin: Math.max(15, Math.round(totalKm * 5.2 + (reps * restSec) / 60)),
+      rpe: 8,
+      focus: 'Entrenamiento estructurado personalizado con guía de bloques y alertas en vivo.',
+      structure,
+      isCustom: true,
+      customBlocks
+    };
+
+    const updated = saveCustomRunningSession(nickname, newSession);
+    setCustomSessions(updated);
+    setSelectedSessionId(newSession.id);
+    setShowCustomModal(false);
+    if (onNotification) onNotification(`¡Rutina de running "${newSession.name}" creada!`);
   };
 
   const handleDeleteRun = async (id: string) => {
@@ -299,47 +363,6 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
       if (!ok) return;
     }
     setLogs((prev) => prev.filter((l) => l.id !== id));
-  };
-
-  const handleQuickLogPlannedSession = async (session: PlannedRunningSession) => {
-    if (completedPlanIds[session.id]) {
-      setCompletedPlanIds((prev) => {
-        const copy = { ...prev };
-        delete copy[session.id];
-        return copy;
-      });
-      setSyncMsg(`Sesión "${session.dayTitle}" marcada como pendiente.`);
-      setTimeout(() => setSyncMsg(null), 3000);
-      return;
-    }
-
-    const draft = {
-      date: Date.now(),
-      distanceKm: session.distanceKm,
-      durationMin: session.estimatedDurationMin,
-      type: session.type,
-      rpe: session.rpe,
-      notes: `Sesión guiada: ${session.name} (${session.targetPaceLabel})`,
-    };
-
-    if (user) {
-      const saved = await addRunLogCloud(user.id, draft);
-      if (saved) setLogs((prev) => [...prev, saved]);
-    } else {
-      const newLog: RunLog = {
-        id: `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        ...draft,
-      };
-      setLogs((prev) => [...prev, newLog]);
-    }
-
-    setCompletedPlanIds((prev) => ({
-      ...prev,
-      [session.id]: true,
-    }));
-
-    setSyncMsg(`¡Sesión "${session.dayTitle}" registrada con éxito! (+${session.distanceKm} km en tu volumen semanal)`);
-    setTimeout(() => setSyncMsg(null), 4000);
   };
 
   const sortedLogs = [...logs].sort((a, b) => b.date - a.date);
@@ -356,6 +379,7 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
     currentWeekNumber,
     targetWeeks
   );
+  const allAvailableSessions = [...plannedSessions, ...customSessions];
   const coachGuidance = getRunningCoachGuidance(
     phaseDetails.phase,
     raceDistance,
@@ -375,8 +399,14 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
   };
 
   // Sesión actualmente seleccionada por el atleta (libertad total de inspección y orden)
-  const activeSession = plannedSessions.find((s) => s.id === selectedSessionId) || plannedSessions[0];
+  const activeSession = allAvailableSessions.find((s) => s.id === selectedSessionId) || plannedSessions[0];
   const isActiveCompleted = Boolean(completedPlanIds[activeSession.id]);
+  const activePartialInfo = partialPlanInfo[activeSession.id];
+
+  const openWorkoutTracker = (session: PlannedRunningSession | null) => {
+    setTrackerSession(session);
+    setShowLiveTracker(true);
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -387,10 +417,10 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
             Running
           </h2>
           <p className="text-[#A8B0BB] text-sm mt-1">
-            Planes periodizados inteligentes (80/20), ritmos calibrados y registro GPS
+            Planes periodizados inteligentes (80/20), guía de series por bloques y GPS en tiempo real
           </p>
         </div>
-        <div className="relative flex items-center gap-2">
+        <div className="relative flex items-center gap-2 flex-wrap">
           {user && (
             <button
               onClick={signOut}
@@ -402,57 +432,21 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
             </button>
           )}
 
-          <div className="relative">
-            <button
-              onClick={() => setShowRegisterMenu(!showRegisterMenu)}
-              className="flex items-center gap-2 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black px-4 py-2.5 rounded-2xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Registrar carrera</span>
-              <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showRegisterMenu ? 'rotate-180' : ''}`} />
-            </button>
+          <button
+            onClick={() => setShowCustomModal(true)}
+            className="flex items-center gap-1.5 bg-[#20252C] hover:bg-[#282F38] text-[#F4F2ED] border border-[#282F38] font-bold px-3.5 py-2.5 rounded-2xl text-xs transition-all cursor-pointer"
+          >
+            <Plus className="w-4 h-4 text-[#5B8DEF]" />
+            <span>Crear Rutina Running</span>
+          </button>
 
-            {showRegisterMenu && (
-              <div 
-                className="absolute right-0 mt-2 w-56 bg-[#20252C] border border-[#282F38] rounded-2xl shadow-2xl z-30 p-1.5 space-y-1 animate-fadeIn"
-                onClick={() => setShowRegisterMenu(false)}
-              >
-                <button
-                  onClick={() => setShowLiveTracker(true)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-[#F4F2ED] hover:bg-[#15181D] transition-colors text-left"
-                >
-                  <Navigation className="w-3.5 h-3.5 text-[#1FD08A]" />
-                  <span>Grabar GPS en vivo</span>
-                </button>
-
-                <button
-                  onClick={() => setShowForm((v) => !v)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-[#F4F2ED] hover:bg-[#15181D] transition-colors text-left"
-                >
-                  <Plus className="w-3.5 h-3.5 text-[#5B8DEF]" />
-                  <span>Registro manual</span>
-                </button>
-
-                <button
-                  onClick={() => setShowStravaModal(true)}
-                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-[#F4F2ED] hover:bg-[#15181D] transition-colors text-left"
-                >
-                  <Compass className="w-3.5 h-3.5 text-[#FB923C]" />
-                  <span>Strava &amp; Archivos GPX</span>
-                </button>
-
-                {!user && (
-                  <button
-                    onClick={() => setShowAuthScreen(true)}
-                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-bold text-[#A8B0BB] hover:text-[#F4F2ED] hover:bg-[#15181D] transition-colors text-left border-t border-[#282F38] pt-2"
-                  >
-                    <CloudOff className="w-3.5 h-3.5 text-zinc-400" />
-                    <span>Sincronizar en la nube</span>
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
+          <button
+            onClick={() => openWorkoutTracker(null)}
+            className="flex items-center gap-2 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black px-4 py-2.5 rounded-2xl text-xs shadow-md transition-all active:scale-95 cursor-pointer"
+          >
+            <Play className="w-4 h-4 fill-current" />
+            <span>Iniciar Carrera Libre</span>
+          </button>
         </div>
       </div>
 
@@ -884,11 +878,11 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
                 Sesiones de la semana (Elige cuál realizar hoy)
               </span>
               <p className="text-[11px] text-[#A8B0BB]">
-                Toca cualquier sesión para ver su estructura completa o realizarla sin importar el orden.
+                Selecciona cualquier sesión y pulsa <strong>Iniciar Entrenamiento</strong> para que la app te guíe bloque por bloque en vivo.
               </p>
             </div>
             <span className="text-[11px] font-bold text-[#1FD08A] bg-[#1FD08A]/10 border border-[#1FD08A]/20 px-2.5 py-0.5 rounded-full">
-              {Object.values(completedPlanIds).filter(Boolean).length} de 4 completadas
+              {plannedSessions.filter((s) => completedPlanIds[s.id]).length} de 4 completadas
             </span>
           </div>
 
@@ -897,6 +891,7 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
             {plannedSessions.map((session, sIdx) => {
               const isSelected = activeSession.id === session.id;
               const isCompleted = Boolean(completedPlanIds[session.id]);
+              const partialInfo = partialPlanInfo[session.id];
               const num = sIdx + 1;
 
               return (
@@ -907,7 +902,9 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
                     isSelected
                       ? 'bg-[#5B8DEF]/15 border-[#5B8DEF] ring-2 ring-[#5B8DEF] shadow-lg'
                       : isCompleted
-                      ? 'bg-[#15181D] border-emerald-500/40 opacity-90'
+                      ? 'bg-[#15181D] border-emerald-500/40 opacity-95'
+                      : partialInfo
+                      ? 'bg-[#15181D] border-amber-500/40'
                       : 'bg-[#15181D] border-[#282F38] hover:border-[#38414D]'
                   }`}
                 >
@@ -918,6 +915,10 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
                     {isCompleted ? (
                       <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-0.5">
                         <Check className="w-2.5 h-2.5" /> Hecha
+                      </span>
+                    ) : partialInfo ? (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        ⏳ Parcial ({partialInfo.distanceKm}km)
                       </span>
                     ) : (
                       <span className="text-[9px] font-bold text-zinc-500">
@@ -935,10 +936,80 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
             })}
           </div>
 
+          {/* RUTINAS DE RUNNING PERSONALIZADAS DEL ATLETA */}
+          {customSessions.length > 0 && (
+            <div className="pt-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A]">
+                  ✨ Tus Rutinas de Running Personalizadas ({customSessions.length})
+                </span>
+                <button
+                  onClick={() => setShowCustomModal(true)}
+                  className="text-[10px] font-bold text-[#5B8DEF] hover:underline cursor-pointer"
+                >
+                  + Añadir otra
+                </button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                {customSessions.map((cSession) => {
+                  const isSelected = activeSession.id === cSession.id;
+                  const isCompleted = Boolean(completedPlanIds[cSession.id]);
+                  const partialInfo = partialPlanInfo[cSession.id];
+                  return (
+                    <div
+                      key={cSession.id}
+                      onClick={() => setSelectedSessionId(cSession.id)}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                        isSelected
+                          ? 'bg-[#1FD08A]/15 border-[#1FD08A] ring-1 ring-[#1FD08A]'
+                          : 'bg-[#15181D] border-[#282F38] hover:border-[#1FD08A]/40'
+                      }`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="text-[9px] font-black uppercase text-[#1FD08A] bg-[#1FD08A]/10 px-1.5 py-0.5 rounded">
+                            Personalizada
+                          </span>
+                          {isCompleted && (
+                            <span className="text-[9px] font-black text-emerald-400">✓ Hecha</span>
+                          )}
+                          {!isCompleted && partialInfo && (
+                            <span className="text-[9px] font-black text-amber-300">
+                              ⏳ Parcial ({partialInfo.distanceKm} km)
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs font-bold text-white truncate">{cSession.name}</p>
+                        <p className="text-[10px] text-[#A8B0BB] font-mono">
+                          {cSession.distanceKm} km · {cSession.targetPaceLabel}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const next = deleteCustomRunningSession(nickname, cSession.id);
+                          setCustomSessions(next);
+                          if (selectedSessionId === cSession.id) {
+                            setSelectedSessionId(plannedSessions[0].id);
+                          }
+                        }}
+                        className="p-1.5 text-zinc-500 hover:text-rose-400 rounded-lg transition-colors cursor-pointer"
+                        title="Eliminar rutina personalizada"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* TARJETA DETALLADA DE LA SESIÓN SELECCIONADA */}
           <div className="bg-[#15181D] border-2 border-[#5B8DEF]/60 rounded-3xl p-5 shadow-2xl space-y-4 animate-fadeIn">
             <div className="flex items-center justify-between gap-2 flex-wrap">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="bg-[#5B8DEF]/20 text-[#5B8DEF] font-black text-[10px] uppercase px-2.5 py-0.5 rounded-full border border-[#5B8DEF]/30">
                   {activeSession.dayTitle}
                 </span>
@@ -948,6 +1019,16 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
                 <span className="text-[10px] font-bold text-[#A8B0BB] bg-[#20252C] px-2 py-0.5 rounded-full">
                   ~{activeSession.estimatedDurationMin} min
                 </span>
+                {isActiveCompleted && (
+                  <span className="text-[10px] font-black bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2.5 py-0.5 rounded-full">
+                    ✓ Sesión Completada
+                  </span>
+                )}
+                {!isActiveCompleted && activePartialInfo && (
+                  <span className="text-[10px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2.5 py-0.5 rounded-full">
+                    ⏳ Parcial / Incompleta: {activePartialInfo.distanceKm} de {activeSession.distanceKm} km ({activePartialInfo.completedBlocksCount}/{activePartialInfo.totalBlocksCount} bloques)
+                  </span>
+                )}
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-mono font-black text-[#1FD08A] bg-[#1FD08A]/10 border border-[#1FD08A]/20 px-2.5 py-0.5 rounded-lg">
@@ -966,7 +1047,7 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
             {/* Estructura detallada del entrenamiento */}
             <div className="space-y-2 border-t border-[#282F38] pt-3">
               <span className="text-[10px] font-black uppercase text-[#A8B0BB] tracking-wider block">
-                Estructura paso a paso de la sesión:
+                Estructura paso a paso de la sesión (Guía automática en vivo):
               </span>
               {activeSession.structure.map((st, i) => (
                 <div key={i} className="text-xs text-zinc-300 leading-relaxed flex items-start gap-2 bg-[#20252C]/40 p-2 rounded-xl">
@@ -976,29 +1057,24 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
               ))}
             </div>
 
-            {/* Botones de acción directa */}
+            {/* Botón único de acción directa: Iniciar Entrenamiento con Guía en Vivo y GPS */}
             <div className="pt-3 border-t border-[#282F38] flex items-center justify-between gap-3 flex-wrap">
               <span className="text-[11px] text-[#A8B0BB] italic max-w-sm">
                 💡 {activeSession.focus}
               </span>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setShowLiveTracker(true)}
-                  className="px-4 py-2.5 bg-[#20252C] hover:bg-[#282F38] text-white font-bold text-xs rounded-xl flex items-center gap-1.5 border border-[#282F38] transition-all cursor-pointer"
+                  onClick={() => openWorkoutTracker(activeSession)}
+                  className="px-6 py-3 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black text-xs sm:text-sm rounded-2xl flex items-center gap-2 shadow-[0_6px_20px_rgba(31,208,138,0.28)] transition-all active:scale-95 cursor-pointer"
                 >
-                  <Navigation className="w-3.5 h-3.5 text-[#5B8DEF]" />
-                  <span>Grabar con GPS</span>
-                </button>
-                <button
-                  onClick={() => handleQuickLogPlannedSession(activeSession)}
-                  className={`px-5 py-2.5 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all shadow-md cursor-pointer ${
-                    isActiveCompleted
-                      ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30'
-                      : 'bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D]'
-                  }`}
-                >
-                  {isActiveCompleted ? <Check className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                  <span>{isActiveCompleted ? 'Completada ✓ (Toca para desmarcar)' : 'Completar esta sesión'}</span>
+                  <Play className="w-4 h-4 fill-current" />
+                  <span>
+                    {isActiveCompleted
+                      ? 'Repetir Entrenamiento'
+                      : activePartialInfo
+                      ? 'Continuar / Iniciar Entrenamiento'
+                      : 'Iniciar Entrenamiento'}
+                  </span>
                 </button>
               </div>
             </div>
@@ -1032,11 +1108,15 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
                       </p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {completedPlanIds[s.id] && (
+                      {completedPlanIds[s.id] ? (
                         <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full">
                           Hecha ✓
                         </span>
-                      )}
+                      ) : partialPlanInfo[s.id] ? (
+                        <span className="text-[10px] font-bold text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-full">
+                          ⏳ Parcial ({partialPlanInfo[s.id].distanceKm} km)
+                        </span>
+                      ) : null}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1044,7 +1124,7 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
                         }}
                         className="px-2.5 py-1 text-[11px] font-bold bg-[#20252C] hover:bg-[#282F38] text-white rounded-lg border border-[#282F38]"
                       >
-                        Ver detalles
+                        Seleccionar
                       </button>
                     </div>
                   </div>
@@ -1055,130 +1135,20 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
         </div>
       </div>
 
-      {showForm && (
-        <div className="mb-5 bg-[#20252C] border border-[#282F38] rounded-3xl p-5 space-y-3.5 shadow-xl animate-fadeIn">
-          <div className="flex items-center justify-between border-b border-[#282F38] pb-2.5">
-            <h4 className="text-xs font-black uppercase tracking-wider text-[#F4F2ED] flex items-center gap-2">
-              <Plus className="w-4 h-4 text-[#1FD08A]" />
-              <span>Registro Manual de Carrera</span>
-            </h4>
-            <button
-              onClick={() => {
-                resetForm();
-                setShowForm(false);
-              }}
-              className="text-zinc-400 hover:text-white p-1 rounded-lg hover:bg-[#15181D]"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-
-          {formError && (
-            <div className="p-2.5 bg-red-950/60 border border-red-500/40 rounded-xl text-red-200 text-xs font-bold flex items-center gap-2 animate-fadeIn">
-              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-              <span>{formError}</span>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div>
-              <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1">Fecha</label>
-              <input
-                type="date"
-                value={formDate}
-                onChange={(e) => setFormDate(e.target.value)}
-                className="w-full bg-[#15181D] border border-[#282F38] focus:border-[#1FD08A] rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1">Distancia (km)</label>
-              <input
-                type="text"
-                placeholder="Ej: 5 o 3.5"
-                value={formDistance}
-                onChange={(e) => {
-                  setFormDistance(e.target.value);
-                  if (formError) setFormError(null);
-                }}
-                className="w-full bg-[#15181D] border border-[#282F38] focus:border-[#1FD08A] rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1">Duración (min)</label>
-              <input
-                type="text"
-                placeholder="Ej: 25 o 45"
-                value={formDuration}
-                onChange={(e) => {
-                  setFormDuration(e.target.value);
-                  if (formError) setFormError(null);
-                }}
-                className="w-full bg-[#15181D] border border-[#282F38] focus:border-[#1FD08A] rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1">RPE (1-10)</label>
-              <input
-                type="number"
-                min={1}
-                max={10}
-                value={formRpe}
-                onChange={(e) => setFormRpe(Math.min(10, Math.max(1, parseInt(e.target.value, 10) || 1)))}
-                className="w-full bg-[#15181D] border border-[#282F38] focus:border-[#1FD08A] rounded-xl px-2.5 py-2 text-xs font-bold text-white focus:outline-none"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1.5">Tipo de sesión</label>
-            <div className="flex flex-wrap gap-1.5">
-              {RUN_TYPES.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => setFormType(t.id)}
-                  title={t.description}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
-                    formType === t.id
-                      ? 'bg-[#1FD08A] border-[#1FD08A] text-[#15181D]'
-                      : 'bg-[#15181D] border-[#282F38] text-[#A8B0BB] hover:text-white'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <label className="text-[10px] uppercase font-black text-[#A8B0BB] tracking-wider block mb-1">Notas (opcional)</label>
-            <input
-              type="text"
-              placeholder="Sensaciones, clima, terreno, zapatillas..."
-              value={formNotes}
-              onChange={(e) => setFormNotes(e.target.value)}
-              className="w-full bg-[#15181D] border border-[#282F38] focus:border-[#1FD08A] rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none"
-            />
-          </div>
-
-          <button
-            onClick={handleAddRun}
-            className="w-full bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black py-3 rounded-2xl text-xs sm:text-sm transition-all shadow-md cursor-pointer"
-          >
-            Guardar carrera en Historial
-          </button>
-        </div>
-      )}
-
+      {/* HISTORIAL REAL DE ENTRENAMIENTOS DE RUNNING */}
       <div className="space-y-2 flex-1 overflow-y-auto">
         {sortedLogs.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-[#A8B0BB] py-16 bg-[#20252C]/40 rounded-3xl border border-[#282F38]">
             <Footprints className="w-12 h-12 mb-4 opacity-20 text-[#1FD08A]" />
-            <p className="font-bold text-sm text-[#F4F2ED]">Aún no has registrado carreras</p>
-            <p className="text-xs text-[#A8B0BB] mt-1">Usa la grabación GPS o el registro manual para empezar.</p>
+            <p className="font-bold text-sm text-[#F4F2ED]">Aún no has registrado entrenamientos de running</p>
+            <p className="text-xs text-[#A8B0BB] mt-1">
+              Elige una sesión del plan y pulsa <strong>Iniciar Entrenamiento</strong> para registrar tus métricas reales.
+            </p>
           </div>
         ) : (
           sortedLogs.map((log) => {
             const hasGpsRoute = Boolean(log.route && log.route.length > 0);
+            const isPartialNote = Boolean(log.notes && log.notes.includes('[Parcial'));
 
             return (
               <div
@@ -1193,6 +1163,15 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
                     <span className="text-[10px] text-[#A8B0BB] font-bold">
                       {new Date(log.date).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}
                     </span>
+                    {isPartialNote ? (
+                      <span className="text-[10px] bg-amber-500/15 text-amber-300 border border-amber-500/30 px-2 py-0.5 rounded-full font-bold">
+                        ⏳ Parcial / Incompleta
+                      </span>
+                    ) : (
+                      <span className="text-[10px] bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded-full font-bold">
+                        ✓ Completada
+                      </span>
+                    )}
                     {hasGpsRoute && (
                       <span className="text-[10px] bg-sky-500/10 text-sky-400 border border-sky-500/20 px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
                         <MapPin className="w-2.5 h-2.5 text-sky-400" />
@@ -1217,17 +1196,6 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
                     <span>Ver Actividad</span>
                   </button>
 
-                  {hasGpsRoute && (
-                    <button
-                      onClick={() => handleDownloadLogGPX(log)}
-                      className="px-2.5 py-1.5 bg-[#15181D] hover:bg-[#282F38] text-orange-400 border border-orange-500/30 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
-                      title="Descargar archivo GPX para Strava"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>GPX</span>
-                    </button>
-                  )}
-
                   <button
                     onClick={() => handleDeleteRun(log.id)}
                     className="p-2 rounded-xl text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0 cursor-pointer"
@@ -1242,20 +1210,134 @@ export default function RunningModule({ nickname, onNotification }: RunningModul
         )}
       </div>
 
-      {/* MODAL PARA GRABACIÓN DE CARRERA GPS EN VIVO */}
-      {showLiveTracker && (
-        <RunningLiveTracker
-          onSaveRun={handleSaveTrackedRun}
-          onClose={() => setShowLiveTracker(false)}
-          onNotification={onNotification}
-        />
+      {/* MODAL CREADOR DE RUTINA DE RUNNING PERSONALIZADA */}
+      {showCustomModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="bg-[#15181D] border border-[#282F38] rounded-3xl w-full max-w-md p-5 text-white shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-[#282F38] pb-3">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-wider text-[#1FD08A] block">
+                  Entrenamiento Guiado a Medida
+                </span>
+                <h3 className="text-base font-black text-white">Crear Rutina de Running</h3>
+              </div>
+              <button
+                onClick={() => setShowCustomModal(false)}
+                className="p-1.5 rounded-xl text-zinc-400 hover:text-white hover:bg-[#20252C]"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Nombre de la sesión</label>
+                <input
+                  type="text"
+                  value={customName}
+                  onChange={(e) => setCustomName(e.target.value)}
+                  placeholder="Ej: Series 5 × 1000m en pista"
+                  className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2.5">
+                <div>
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Calentamiento (km)</label>
+                  <input
+                    type="text"
+                    value={customWarmupKm}
+                    onChange={(e) => setCustomWarmupKm(e.target.value)}
+                    placeholder="2.0"
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Vuelta a la calma (km)</label>
+                  <input
+                    type="text"
+                    value={customCooldownKm}
+                    onChange={(e) => setCustomCooldownKm(e.target.value)}
+                    placeholder="1.5"
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">N° de Series</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="30"
+                    value={customReps}
+                    onChange={(e) => setCustomReps(e.target.value)}
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Distancia (m)</label>
+                  <input
+                    type="number"
+                    step="100"
+                    min="100"
+                    value={customIntervalMeters}
+                    onChange={(e) => setCustomIntervalMeters(e.target.value)}
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Descanso (seg)</label>
+                  <input
+                    type="number"
+                    step="15"
+                    min="0"
+                    value={customRestSec}
+                    onChange={(e) => setCustomRestSec(e.target.value)}
+                    className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-[#A8B0BB] block mb-1">Ritmo objetivo de las series</label>
+                <input
+                  type="text"
+                  value={customPaceLabel}
+                  onChange={(e) => setCustomPaceLabel(e.target.value)}
+                  placeholder="Ej: 4:20 min/km"
+                  className="w-full bg-[#20252C] border border-[#282F38] rounded-xl px-3 py-2 text-white font-bold focus:outline-none focus:border-[#1FD08A]"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowCustomModal(false)}
+                className="flex-1 py-2.5 bg-[#20252C] hover:bg-[#282F38] text-[#A8B0BB] font-bold rounded-xl text-xs cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleCreateCustomRunningSession}
+                className="flex-1 py-2.5 bg-[#1FD08A] hover:bg-[#1ab87a] text-[#15181D] font-black rounded-xl text-xs cursor-pointer"
+              >
+                Guardar Rutina Running
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* MODAL DE CONECTIVIDAD STRAVA Y RUTAS GPX */}
-      {showStravaModal && (
-        <StravaSyncModal
-          onClose={() => setShowStravaModal(false)}
-          onImportRun={handleSaveTrackedRun}
+      {/* MODAL PARA ENTRENAMIENTO GUIADO POR BLOQUES Y GPS EN VIVO */}
+      {showLiveTracker && (
+        <RunningLiveTracker
+          plannedSession={trackerSession}
+          onSaveRun={handleSaveTrackedRun}
+          onClose={() => setShowLiveTracker(false)}
           onNotification={onNotification}
         />
       )}
